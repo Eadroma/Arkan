@@ -8,4 +8,4 @@ node_modules/
 *.sqlite
 *.sqlite3
 src-tauri/target/
-
+src-tauri/gen/

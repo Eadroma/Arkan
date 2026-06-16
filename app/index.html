@@ -5,38 +5,133 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Arkan</title>
     <link rel="stylesheet" href="./styles.css" />
+    <script defer src="./app.js"></script>
   </head>
   <body>
     <main class="shell">
       <aside class="sidebar">
-        <div class="brand">Arkan</div>
-        <nav>
-          <a class="active" href="#">Profil</a>
-          <a href="#">Matchs</a>
-          <a href="#">Champions</a>
-          <a href="#">Insights</a>
-          <a href="#">Settings</a>
+        <div class="sidebar-header">
+          <a class="brand" href="#" aria-label="Arkan home">
+            <span class="brand-mark">A</span>
+            <span class="brand-name">Arkan</span>
+          </a>
+          <button class="icon-button sidebar-toggle" type="button" aria-label="Reduce sidebar">
+            <span class="collapse-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+
+        <nav class="nav" aria-label="Primary navigation">
+          <a class="nav-item active" href="#" aria-current="page" data-icon="P">
+            <span class="nav-icon" aria-hidden="true">P</span>
+            <span class="nav-label">Profil</span>
+          </a>
+          <a class="nav-item" href="#" data-icon="M">
+            <span class="nav-icon" aria-hidden="true">M</span>
+            <span class="nav-label">Matchs</span>
+          </a>
+          <a class="nav-item" href="#" data-icon="C">
+            <span class="nav-icon" aria-hidden="true">C</span>
+            <span class="nav-label">Champions</span>
+          </a>
+          <a class="nav-item" href="#" data-icon="I">
+            <span class="nav-icon" aria-hidden="true">I</span>
+            <span class="nav-label">Insights</span>
+          </a>
+          <a class="nav-item" href="#" data-icon="S">
+            <span class="nav-icon" aria-hidden="true">S</span>
+            <span class="nav-label">Settings</span>
+          </a>
         </nav>
       </aside>
+
       <section class="content">
         <header class="topbar">
-          <label class="search">
-            <span>Riot ID</span>
-            <input placeholder="GameName#TAG" />
-          </label>
-          <select aria-label="Region">
-            <option>EUW1</option>
-            <option>NA1</option>
-            <option>KR</option>
-          </select>
-          <button>Rechercher</button>
+          <div class="view-title">
+            <span class="eyebrow">Workspace</span>
+            <h1>Profil joueur</h1>
+          </div>
+
+          <form class="searchbar">
+            <div class="search-field">
+              <span class="search-glyph" aria-hidden="true"></span>
+              <input aria-label="Riot ID" placeholder="GameName#TAG" />
+            </div>
+            <select aria-label="Region">
+              <option>EUW1</option>
+              <option>NA1</option>
+              <option>KR</option>
+            </select>
+            <button type="submit">Search</button>
+          </form>
         </header>
-        <section class="empty-state">
-          <h1>Rechercher un joueur</h1>
-          <p>Le MVP commencera ici : Riot ID, ranks, historique recent et stats champion.</p>
+
+        <section class="dashboard">
+          <section class="hero-panel">
+            <div class="player-placeholder">
+              <div class="avatar-placeholder">A</div>
+              <div>
+                <p class="panel-kicker">Aucun joueur selectionne</p>
+                <h2>GameName#TAG</h2>
+              </div>
+            </div>
+            <div class="hero-stats" aria-label="Player summary placeholders">
+              <div>
+                <span>Solo/Duo</span>
+                <strong>--</strong>
+              </div>
+              <div>
+                <span>Winrate</span>
+                <strong>--</strong>
+              </div>
+              <div>
+                <span>Games</span>
+                <strong>--</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="cards-grid">
+            <article class="surface-card">
+              <div class="card-header">
+                <h3>Recent form</h3>
+                <span class="status-pill">Cache ready</span>
+              </div>
+              <div class="form-row" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </article>
+
+            <article class="surface-card">
+              <div class="card-header">
+                <h3>Champion pool</h3>
+                <span class="muted">Top 5</span>
+              </div>
+              <div class="empty-lines" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </article>
+
+            <article class="surface-card wide">
+              <div class="card-header">
+                <h3>Match history</h3>
+                <span class="muted">Derniers matchs</span>
+              </div>
+              <div class="match-table" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </article>
+          </section>
         </section>
       </section>
     </main>
   </body>
 </html>
-
