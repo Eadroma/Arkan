@@ -371,7 +371,7 @@ button[type="submit"]:hover {
 
 .hero-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 300px) auto;
   align-items: center;
   gap: 24px;
   min-height: 132px;
@@ -410,6 +410,61 @@ button[type="submit"]:hover {
   color: var(--text-strong);
   font-size: 28px;
   letter-spacing: 0;
+}
+
+.client-status {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: rgb(255 255 255 / 3%);
+  padding: 12px;
+}
+
+.client-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  box-shadow: 0 0 0 4px rgb(141 152 170 / 12%);
+}
+
+.client-dot.online {
+  background: var(--success);
+  box-shadow: 0 0 0 4px rgb(47 191 122 / 14%);
+}
+
+.client-dot.warning,
+.client-dot.pending {
+  background: var(--warning);
+  box-shadow: 0 0 0 4px rgb(242 184 75 / 14%);
+}
+
+.client-dot.offline {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px rgb(239 111 114 / 14%);
+}
+
+.client-status strong,
+.client-status span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.client-status strong {
+  color: var(--text-main);
+  font-size: 13px;
+}
+
+.client-status span {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .hero-stats {
@@ -496,6 +551,37 @@ button[type="submit"]:hover {
 .form-row span:nth-child(2),
 .form-row span:nth-child(5) {
   background: linear-gradient(180deg, rgb(239 111 114 / 19%), rgb(239 111 114 / 5%));
+}
+
+.client-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.client-details div {
+  display: grid;
+  gap: 6px;
+  min-height: 58px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: rgb(255 255 255 / 3%);
+  padding: 10px;
+}
+
+.client-details span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.client-details strong {
+  overflow: hidden;
+  color: var(--text-main);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-lines,

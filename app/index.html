@@ -70,8 +70,15 @@
             <div class="player-placeholder">
               <div class="avatar-placeholder">A</div>
               <div>
-                <p class="panel-kicker">Aucun joueur selectionne</p>
-                <h2>GameName#TAG</h2>
+                <p class="panel-kicker" data-lcu-kicker>Detection client League</p>
+                <h2 data-player-title>Recherche automatique...</h2>
+              </div>
+            </div>
+            <div class="client-status" data-client-status>
+              <span class="client-dot pending" data-client-dot></span>
+              <div>
+                <strong data-client-label>Client en verification</strong>
+                <span data-client-detail>Arkan cherche le client League local.</span>
               </div>
             </div>
             <div class="hero-stats" aria-label="Player summary placeholders">
@@ -93,15 +100,22 @@
           <section class="cards-grid">
             <article class="surface-card">
               <div class="card-header">
-                <h3>Recent form</h3>
-                <span class="status-pill">Cache ready</span>
+                <h3>League Client</h3>
+                <span class="status-pill" data-lcu-pill>Scanning</span>
               </div>
-              <div class="form-row" aria-hidden="true">
-                <span></span>
-                <span></span>
-                <span></span>
-                <span></span>
-                <span></span>
+              <div class="client-details">
+                <div>
+                  <span>Status</span>
+                  <strong data-lcu-status>Checking</strong>
+                </div>
+                <div>
+                  <span>Port</span>
+                  <strong data-lcu-port>--</strong>
+                </div>
+                <div>
+                  <span>Level</span>
+                  <strong data-lcu-level>--</strong>
+                </div>
               </div>
             </article>
 

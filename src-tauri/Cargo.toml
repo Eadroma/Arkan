@@ -8,5 +8,6 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 arkan-core = { path = "../crates/arkan-core" }
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
+serde = { version = "1", features = ["derive"] }
 tauri = { version = "2", features = [] }
-
