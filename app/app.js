@@ -9,6 +9,8 @@ const lcuPill = document.querySelector("[data-lcu-pill]");
 const lcuStatus = document.querySelector("[data-lcu-status]");
 const lcuPort = document.querySelector("[data-lcu-port]");
 const lcuLevel = document.querySelector("[data-lcu-level]");
+const avatarImg = document.querySelector("[data-avatar-img]");
+const avatarFallback = document.querySelector("[data-avatar-fallback]");
 
 const savedSidebarState = localStorage.getItem("arkan.sidebar");
 
@@ -65,6 +67,7 @@ async function detectLeagueClient() {
         port: status.port ?? "--",
         level: summoner.summonerLevel ?? "--",
       });
+      setProfileIcon(summoner.profileIconId);
       return;
     }
 
@@ -94,6 +97,7 @@ async function detectLeagueClient() {
       port: "--",
       level: "--",
     });
+    resetProfileIcon();
   } catch (error) {
     setLeagueClientState({
       variant: "warning",
@@ -106,6 +110,7 @@ async function detectLeagueClient() {
       port: "--",
       level: "--",
     });
+    resetProfileIcon();
   }
 }
 
@@ -121,4 +126,33 @@ function setLeagueClientState({ variant, title, kicker, label, detail, pill, sta
 
   clientDot.classList.remove("pending", "online", "offline", "warning");
   clientDot.classList.add(variant);
+}
+
+async function setProfileIcon(profileIconId) {
+  if (!profileIconId) {
+    resetProfileIcon();
+    return;
+  }
+
+  try {
+    const response = await fetch("https://ddragon.leagueoflegends.com/api/versions.json");
+    const versions = await response.json();
+    const version = versions[0];
+
+    const iconUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${profileIconId}.png`;
+    avatarImg.onload = () => {
+      avatarImg.hidden = false;
+      avatarFallback.hidden = true;
+    };
+    avatarImg.onerror = resetProfileIcon;
+    avatarImg.src = iconUrl;
+  } catch {
+    resetProfileIcon();
+  }
+}
+
+function resetProfileIcon() {
+  avatarImg.removeAttribute("src");
+  avatarImg.hidden = true;
+  avatarFallback.hidden = false;
 }
