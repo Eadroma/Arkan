@@ -27,10 +27,27 @@ docs                Product and technical docs
 cargo test -p arkan-core
 ```
 
+If the MSVC linker is not available yet, use:
+
+```powershell
+cargo check -p arkan-core
+```
+
+## Local Configuration
+
+Runtime configuration is read from environment variables during early development:
+
+```txt
+RIOT_API_KEY=RGAPI-your-development-key
+ARKAN_DEFAULT_PLATFORM=EUW1
+ARKAN_DEFAULT_LANGUAGE=fr_FR
+```
+
+The Tauri command only reports whether a key is configured and masks the value.
+
 ## Notion
 
 Project documentation and ticket tracking live in Notion:
 
 - Hub: https://app.notion.com/p/3813f0d3e8bf8139b858df69b6f3ad44
 - Tickets: https://app.notion.com/p/21ec57af53224e9bb2b9ab08c75450ab
-
