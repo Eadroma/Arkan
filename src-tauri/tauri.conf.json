@@ -10,6 +10,7 @@
     "beforeBuildCommand": ""
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "Arkan",
@@ -29,4 +30,3 @@
     "icon": []
   }
 }
-
