@@ -1,8 +1,8 @@
 # Arkan
 
-Arkan is a Rust-first desktop companion for League of Legends.
+Arkan is a Rust-first desktop companion for League of Legends: a local-first player profile, match history, and progression analysis app inspired by tools like OP.GG and Blitz, built with a careful Riot API integration.
 
-The current goal is to build a careful MVP before expanding into live-client or overlay features:
+The project starts with a focused MVP before expanding into live-client or overlay features:
 
 - search a player by Riot ID;
 - resolve PUUID and summoner data through Riot APIs;
@@ -10,9 +10,13 @@ The current goal is to build a careful MVP before expanding into live-client or 
 - display ranked state, recent matches, and champion trends;
 - keep Riot policy constraints visible in the product and codebase.
 
+## Repository Description
+
+Rust/Tauri League of Legends companion app for Riot ID lookup, local match-history cache, champion statistics, and progression insights.
+
 ## Current Status
 
-The repository starts with a testable Rust core crate and a Tauri scaffold.
+The repository currently contains a testable Rust core crate and a Tauri scaffold.
 
 ```txt
 crates/arkan-core   Shared domain logic, parsing, routing, tests
@@ -44,6 +48,23 @@ ARKAN_DEFAULT_LANGUAGE=fr_FR
 ```
 
 The Tauri command only reports whether a key is configured and masks the value.
+
+## Early Features
+
+- `arkan-core` Riot ID parser with unit tests.
+- Riot platform and regional route mapping.
+- Local app configuration through environment variables.
+- Tauri command scaffold for parser/config access.
+- Static desktop UI shell for the first profile/search screen.
+
+## Roadmap Snapshot
+
+1. Riot API client with ACCOUNT-V1.
+2. SQLite migrations and local cache.
+3. Summoner and ranked profile lookup.
+4. MATCH-V5 history and match detail normalization.
+5. Data Dragon champion/item integration.
+6. Player profile and match detail UI.
 
 ## Notion
 
