@@ -1,0 +1,11 @@
+target/
+dist/
+node_modules/
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+src-tauri/target/
+

@@ -1,0 +1,11 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/arkan-core",
+]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/Eadroma/Arkan"
+

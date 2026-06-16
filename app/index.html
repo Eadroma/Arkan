@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arkan</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="sidebar">
+        <div class="brand">Arkan</div>
+        <nav>
+          <a class="active" href="#">Profil</a>
+          <a href="#">Matchs</a>
+          <a href="#">Champions</a>
+          <a href="#">Insights</a>
+          <a href="#">Settings</a>
+        </nav>
+      </aside>
+      <section class="content">
+        <header class="topbar">
+          <label class="search">
+            <span>Riot ID</span>
+            <input placeholder="GameName#TAG" />
+          </label>
+          <select aria-label="Region">
+            <option>EUW1</option>
+            <option>NA1</option>
+            <option>KR</option>
+          </select>
+          <button>Rechercher</button>
+        </header>
+        <section class="empty-state">
+          <h1>Rechercher un joueur</h1>
+          <p>Le MVP commencera ici : Riot ID, ranks, historique recent et stats champion.</p>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>
+
