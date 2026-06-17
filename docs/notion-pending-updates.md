@@ -31,6 +31,6 @@ Update the ticket board after this branch is merged:
 - Ticket: `Créer migrations SQLite initiales`
 - Status: `Done`
 - Branch: `codex/sqlite-initial-migrations`
-- Commit: `145f398`
-- Commit URL: `https://github.com/Eadroma/Arkan/commit/145f398`
+- Commit: `e02fdd1`
+- Commit URL: `https://github.com/Eadroma/Arkan/commit/e02fdd1`
 - Notes: Added SQLite schema migration v1 for players, ranks, matches, and player_matches. Added in-memory migration tests, idempotency tests, and player upsert/read tests. App launched after the task for manual testing.
