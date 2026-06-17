@@ -29,15 +29,15 @@ async function detectLeagueClient() {
   const invoke = window.__TAURI__?.core?.invoke;
 
   if (!invoke) {
-      setLeagueClientState({
-        variant: "offline",
-        title: "GameName#TAG",
-        kicker: "Mode preview",
-        pill: "Preview",
-        status: "Preview",
-        region: "EUW1",
-        level: "--",
-      });
+    setLeagueClientState({
+      variant: "offline",
+      title: "GameName#TAG",
+      kicker: "Mode preview",
+      pill: "Preview",
+      status: "Preview",
+      region: "EUW1",
+      level: "--",
+    });
     return;
   }
 
@@ -50,13 +50,14 @@ async function detectLeagueClient() {
         summoner.gameName && summoner.tagLine
           ? `${summoner.gameName}#${summoner.tagLine}`
           : summoner.displayName;
+      const cacheLabel = status.cached ? "Synced" : "Detected";
 
       setLeagueClientState({
         variant: "online",
         title: riotId,
         kicker: "Joueur connecte detecte",
-        pill: "Connected",
-        status: "Connected",
+        pill: cacheLabel,
+        status: cacheLabel,
         region: "EUW1",
         level: summoner.summonerLevel ?? "--",
       });
