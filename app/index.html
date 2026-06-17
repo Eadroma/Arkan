@@ -21,7 +21,7 @@
         </div>
 
         <nav class="nav" aria-label="Primary navigation">
-          <a class="nav-item active" href="#" aria-current="page" data-icon="P">
+          <a class="nav-item active" href="#" aria-current="page" data-icon="P" data-nav-view="profile">
             <span class="nav-icon" aria-hidden="true">P</span>
             <span class="nav-label">Profil</span>
           </a>
@@ -29,7 +29,7 @@
             <span class="nav-icon" aria-hidden="true">M</span>
             <span class="nav-label">Matchs</span>
           </a>
-          <a class="nav-item" href="#" data-icon="C">
+          <a class="nav-item" href="#" data-icon="C" data-nav-view="champions">
             <span class="nav-icon" aria-hidden="true">C</span>
             <span class="nav-label">Champions</span>
           </a>
@@ -48,10 +48,10 @@
         <header class="topbar">
           <div class="view-title">
             <span class="eyebrow">Workspace</span>
-            <h1>Profil joueur</h1>
+            <h1 data-view-title>Profil joueur</h1>
           </div>
 
-          <form class="searchbar" data-search-form>
+          <form class="searchbar" data-search-form data-profile-toolbar>
             <div class="search-field">
               <span class="search-glyph" aria-hidden="true"></span>
               <input aria-label="Riot ID" placeholder="GameName#TAG" data-search-input />
@@ -65,7 +65,7 @@
           </form>
         </header>
 
-        <section class="dashboard">
+        <section class="dashboard" data-view-panel="profile">
           <section class="hero-panel">
             <div class="player-placeholder">
               <div class="avatar-placeholder">
@@ -140,6 +140,27 @@
                 <span></span>
               </div>
             </article>
+          </section>
+        </section>
+
+        <section class="dashboard" data-view-panel="champions" hidden>
+          <section class="section-head">
+            <div>
+              <p class="panel-kicker">Data Dragon</p>
+              <h2>Champions</h2>
+            </div>
+            <div class="catalog-search">
+              <span class="search-glyph" aria-hidden="true"></span>
+              <input aria-label="Filtrer les champions" placeholder="Chercher un champion" data-champion-search />
+            </div>
+          </section>
+
+          <section class="champion-catalog" data-champion-catalog>
+            <div class="empty-lines" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
           </section>
         </section>
       </section>
