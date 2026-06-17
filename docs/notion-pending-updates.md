@@ -56,3 +56,14 @@ Update the ticket board with:
 - Commit: `3564864`
 - Commit URL: `https://github.com/Eadroma/Arkan/commit/3564864`
 - Notes: The Tauri LCU status command now writes the detected current summoner into the local SQLite database when the League Client returns a PUUID. The profile UI shows `Synced` when the local cache write succeeds and keeps technical details such as DB path and LCU port out of the visible UI. Added a Tauri unit test that persists a detected summoner to SQLite and reads it back. Local validation passed: `cargo fmt --all --check`, `cargo test -p arkan-core`, `cargo test --manifest-path src-tauri/Cargo.toml`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo build --manifest-path src-tauri/Cargo.toml`. App was relaunched for manual testing. During manual LCU probing, the current local LCU response contained no PUUID, so the runtime cache intentionally skipped writing a real profile until League returns a complete identity payload.
+
+## 2026-06-17 - LCU Chat Profile Fallback
+
+Update the ticket board with:
+
+- Ticket: `Ajouter un fallback profil via LCU chat`
+- Status: `Done`
+- Branch: `codex/lcu-profile-fallback`
+- Commit: `86d01c0`
+- Commit URL: `https://github.com/Eadroma/Arkan/commit/86d01c0`
+- Notes: Added a fallback from `/lol-summoner/v1/current-summoner` to `/lol-chat/v1/me` so Arkan can still display the connected Riot ID when the summoner endpoint is empty or unavailable. Added numeric/string ID handling for chat payloads and a unit test for converting chat profile data into the app's current summoner model. Local validation passed: `cargo fmt --all --check`, `cargo test -p arkan-core`, `cargo test --manifest-path src-tauri/Cargo.toml`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo build --manifest-path src-tauri/Cargo.toml`. App was relaunched for manual testing.
