@@ -45,3 +45,14 @@ Update the ticket board with:
 - Commit: `f43e678`
 - Commit URL: `https://github.com/Eadroma/Arkan/commit/f43e678`
 - Notes: Removed the redundant `Client League connecte / Profil local pret a synchroniser` badge from the hero, removed the technical LCU port from the visible UI, replaced it with region, kept the player icon and detected profile display. Local tests/check/build passed, app was relaunched for manual testing, branch merged and pushed to `main`. CI on `main` passed.
+
+## 2026-06-17 - Persist Detected Player Locally
+
+Update the ticket board with:
+
+- Ticket: `Persister le joueur detecte localement`
+- Status: `Done`
+- Branch: `codex/persist-detected-player`
+- Commit: `3564864`
+- Commit URL: `https://github.com/Eadroma/Arkan/commit/3564864`
+- Notes: The Tauri LCU status command now writes the detected current summoner into the local SQLite database when the League Client returns a PUUID. The profile UI shows `Synced` when the local cache write succeeds and keeps technical details such as DB path and LCU port out of the visible UI. Added a Tauri unit test that persists a detected summoner to SQLite and reads it back. Local validation passed: `cargo fmt --all --check`, `cargo test -p arkan-core`, `cargo test --manifest-path src-tauri/Cargo.toml`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo build --manifest-path src-tauri/Cargo.toml`. App was relaunched for manual testing. During manual LCU probing, the current local LCU response contained no PUUID, so the runtime cache intentionally skipped writing a real profile until League returns a complete identity payload.
