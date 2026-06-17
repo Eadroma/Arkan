@@ -2,12 +2,9 @@ const shell = document.querySelector(".shell");
 const toggle = document.querySelector(".sidebar-toggle");
 const playerTitle = document.querySelector("[data-player-title]");
 const lcuKicker = document.querySelector("[data-lcu-kicker]");
-const clientDot = document.querySelector("[data-client-dot]");
-const clientLabel = document.querySelector("[data-client-label]");
-const clientDetail = document.querySelector("[data-client-detail]");
 const lcuPill = document.querySelector("[data-lcu-pill]");
 const lcuStatus = document.querySelector("[data-lcu-status]");
-const lcuPort = document.querySelector("[data-lcu-port]");
+const lcuRegion = document.querySelector("[data-lcu-region]");
 const lcuLevel = document.querySelector("[data-lcu-level]");
 const avatarImg = document.querySelector("[data-avatar-img]");
 const avatarFallback = document.querySelector("[data-avatar-fallback]");
@@ -32,17 +29,15 @@ async function detectLeagueClient() {
   const invoke = window.__TAURI__?.core?.invoke;
 
   if (!invoke) {
-    setLeagueClientState({
-      variant: "offline",
-      title: "GameName#TAG",
-      kicker: "Mode preview",
-      label: "Tauri indisponible",
-      detail: "La detection automatique fonctionne dans l'application desktop.",
-      pill: "Preview",
-      status: "Preview",
-      port: "--",
-      level: "--",
-    });
+      setLeagueClientState({
+        variant: "offline",
+        title: "GameName#TAG",
+        kicker: "Mode preview",
+        pill: "Preview",
+        status: "Preview",
+        region: "EUW1",
+        level: "--",
+      });
     return;
   }
 
@@ -60,11 +55,9 @@ async function detectLeagueClient() {
         variant: "online",
         title: riotId,
         kicker: "Joueur connecte detecte",
-        label: "Client League connecte",
-        detail: summoner.puuid ? "Profil local pret a synchroniser." : "Summoner local detecte.",
         pill: "Connected",
         status: "Connected",
-        port: status.port ?? "--",
+        region: "EUW1",
         level: summoner.summonerLevel ?? "--",
       });
       setProfileIcon(summoner.profileIconId);
@@ -76,11 +69,9 @@ async function detectLeagueClient() {
         variant: "warning",
         title: "Client detecte",
         kicker: "Connexion locale incomplete",
-        label: "Client trouve",
-        detail: status.error ?? "Impossible de lire le joueur courant pour le moment.",
         pill: "Detected",
         status: "Partial",
-        port: status.port ?? "--",
+        region: "EUW1",
         level: "--",
       });
       return;
@@ -90,11 +81,9 @@ async function detectLeagueClient() {
       variant: "offline",
       title: "GameName#TAG",
       kicker: "Aucun client League",
-      label: "Client non detecte",
-      detail: "Lance League of Legends pour reconnaitre le joueur automatiquement.",
       pill: "Offline",
       status: "Offline",
-      port: "--",
+      region: "EUW1",
       level: "--",
     });
     resetProfileIcon();
@@ -103,29 +92,22 @@ async function detectLeagueClient() {
       variant: "warning",
       title: "Detection indisponible",
       kicker: "Erreur locale",
-      label: "Verification echouee",
-      detail: String(error),
       pill: "Error",
       status: "Error",
-      port: "--",
+      region: "EUW1",
       level: "--",
     });
     resetProfileIcon();
   }
 }
 
-function setLeagueClientState({ variant, title, kicker, label, detail, pill, status, port, level }) {
+function setLeagueClientState({ title, kicker, pill, status, region, level }) {
   playerTitle.textContent = title;
   lcuKicker.textContent = kicker;
-  clientLabel.textContent = label;
-  clientDetail.textContent = detail;
   lcuPill.textContent = pill;
   lcuStatus.textContent = status;
-  lcuPort.textContent = port;
+  lcuRegion.textContent = region;
   lcuLevel.textContent = level;
-
-  clientDot.classList.remove("pending", "online", "offline", "warning");
-  clientDot.classList.add(variant);
 }
 
 async function setProfileIcon(profileIconId) {
