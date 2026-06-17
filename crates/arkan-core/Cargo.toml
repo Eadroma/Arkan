@@ -10,6 +10,7 @@ path = "src/lib.rs"
 
 [dependencies]
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
