@@ -13,6 +13,8 @@ const searchForm = document.querySelector("[data-search-form]");
 const searchInput = document.querySelector("[data-search-input]");
 const searchRegion = document.querySelector("[data-search-region]");
 const searchButton = document.querySelector("[data-search-button]");
+const championPool = document.querySelector("[data-champion-pool]");
+const championEmpty = document.querySelector("[data-champion-empty]");
 
 const savedSidebarState = localStorage.getItem("arkan.sidebar");
 
@@ -48,6 +50,7 @@ async function handleConnectedPlayerReset(event) {
     level: "--",
   });
   resetProfileIcon();
+  resetChampionPool();
   await detectLeagueClient();
 }
 
@@ -69,6 +72,7 @@ async function handleManualSearch(event) {
       level: "--",
     });
     resetProfileIcon();
+    resetChampionPool();
     return;
   }
 
@@ -83,6 +87,7 @@ async function handleManualSearch(event) {
     level: "--",
   });
   resetProfileIcon();
+  resetChampionPool();
 
   if (!invoke) {
     setSearchPending(false);
@@ -95,6 +100,7 @@ async function handleManualSearch(event) {
       region,
       level: "--",
     });
+    resetChampionPool();
     return;
   }
 
@@ -117,6 +123,7 @@ async function handleManualSearch(event) {
         level: account.summonerLevel ?? "--",
       });
       setProfileIcon(account.profileIconId);
+      setChampionPool(account.championMasteries);
     } catch (error) {
       setLeagueClientState({
         variant: "warning",
@@ -127,6 +134,7 @@ async function handleManualSearch(event) {
         region,
         level: "--",
       });
+      resetChampionPool();
     }
   } catch (error) {
     setLeagueClientState({
@@ -138,6 +146,7 @@ async function handleManualSearch(event) {
       region,
       level: "--",
     });
+    resetChampionPool();
   } finally {
     setSearchPending(false);
   }
@@ -206,6 +215,7 @@ async function detectLeagueClient() {
       level: "--",
     });
     resetProfileIcon();
+    resetChampionPool();
   } catch (error) {
     setLeagueClientState({
       variant: "warning",
@@ -217,6 +227,7 @@ async function detectLeagueClient() {
       level: "--",
     });
     resetProfileIcon();
+    resetChampionPool();
   }
 }
 
@@ -278,4 +289,68 @@ function resetProfileIcon() {
   avatarImg.removeAttribute("src");
   avatarImg.hidden = true;
   avatarFallback.hidden = false;
+}
+
+async function setChampionPool(masteries) {
+  if (!Array.isArray(masteries) || masteries.length === 0) {
+    resetChampionPool();
+    return;
+  }
+
+  try {
+    const championIndex = await loadChampionIndex();
+
+    championPool.replaceChildren(
+      ...masteries.slice(0, 5).map((mastery) => {
+        const champion = championIndex.get(String(mastery.championId));
+        const row = document.createElement("div");
+        const icon = document.createElement("img");
+        const body = document.createElement("div");
+        const name = document.createElement("strong");
+        const meta = document.createElement("span");
+        const points = new Intl.NumberFormat("fr-FR").format(mastery.championPoints ?? 0);
+
+        row.className = "champion-row";
+        icon.alt = "";
+        icon.src = champion?.iconUrl ?? "";
+        icon.hidden = !champion;
+        name.textContent = champion?.name ?? `Champion ${mastery.championId}`;
+        meta.textContent = `M${mastery.championLevel ?? "--"} · ${points} pts`;
+        body.append(name, meta);
+        row.append(icon, body);
+        return row;
+      }),
+    );
+
+    championPool.hidden = false;
+    championEmpty.hidden = true;
+  } catch {
+    resetChampionPool();
+  }
+}
+
+function resetChampionPool() {
+  championPool.replaceChildren();
+  championPool.hidden = true;
+  championEmpty.hidden = false;
+}
+
+async function loadChampionIndex() {
+  const response = await fetch("https://ddragon.leagueoflegends.com/api/versions.json");
+  const versions = await response.json();
+  const version = versions[0];
+  const championResponse = await fetch(
+    `https://ddragon.leagueoflegends.com/cdn/${version}/data/fr_FR/champion.json`,
+  );
+  const championData = await championResponse.json();
+
+  return new Map(
+    Object.values(championData.data).map((champion) => [
+      champion.key,
+      {
+        name: champion.name,
+        iconUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${champion.image.full}`,
+      },
+    ]),
+  );
 }

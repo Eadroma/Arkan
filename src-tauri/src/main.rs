@@ -33,6 +33,15 @@ struct RiotAccountResponse {
     tag_line: String,
     profile_icon_id: Option<u32>,
     summoner_level: Option<u32>,
+    champion_masteries: Vec<RiotChampionMasteryResponse>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RiotChampionMasteryResponse {
+    champion_id: u32,
+    champion_level: u32,
+    champion_points: u32,
 }
 
 #[tauri::command]
@@ -54,6 +63,17 @@ async fn resolve_riot_account(input: &str, platform: &str) -> Result<RiotAccount
         .summoner_by_puuid(platform, &account.puuid)
         .await
         .ok();
+    let champion_masteries = client
+        .champion_mastery_top(platform, &account.puuid, 5)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|mastery| RiotChampionMasteryResponse {
+            champion_id: mastery.champion_id,
+            champion_level: mastery.champion_level,
+            champion_points: mastery.champion_points,
+        })
+        .collect();
 
     Ok(RiotAccountResponse {
         puuid: account.puuid,
@@ -61,6 +81,7 @@ async fn resolve_riot_account(input: &str, platform: &str) -> Result<RiotAccount
         tag_line: account.tag_line,
         profile_icon_id: summoner.as_ref().map(|summoner| summoner.profile_icon_id),
         summoner_level: summoner.as_ref().map(|summoner| summoner.summoner_level),
+        champion_masteries,
     })
 }
 

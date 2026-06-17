@@ -1,7 +1,7 @@
 use arkan_core::{
     AppConfig, LeagueClientLockfile, PlatformRoute, PlayerRecord, RegionalRoute, RiotId,
-    account_by_riot_id_url, find_player_by_puuid, migrate, schema_version, summoner_by_puuid_url,
-    upsert_player,
+    account_by_riot_id_url, champion_mastery_top_url, find_player_by_puuid, migrate,
+    schema_version, summoner_by_puuid_url, upsert_player,
 };
 
 #[test]
@@ -57,6 +57,14 @@ fn riot_summoner_url_uses_platform_route() {
     assert_eq!(
         summoner_by_puuid_url(PlatformRoute::Euw1, "puuid-local"),
         "https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/puuid-local"
+    );
+}
+
+#[test]
+fn champion_mastery_top_url_uses_platform_route() {
+    assert_eq!(
+        champion_mastery_top_url(PlatformRoute::Euw1, "puuid-local", 5),
+        "https://euw1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/puuid-local/top?count=5"
     );
 }
 

@@ -80,6 +80,33 @@ impl RiotApiClient {
             .await
             .map_err(RiotApiError::Http)
     }
+
+    pub async fn champion_mastery_top(
+        &self,
+        route: PlatformRoute,
+        puuid: &str,
+        count: u8,
+    ) -> Result<Vec<RiotChampionMastery>, RiotApiError> {
+        let url = champion_mastery_top_url(route, puuid, count);
+        let response = self
+            .http
+            .get(url)
+            .header("X-Riot-Token", &self.api_key)
+            .send()
+            .await
+            .map_err(RiotApiError::Http)?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            return Err(RiotApiError::RiotStatus(status.as_u16()));
+        }
+
+        response
+            .json::<Vec<RiotChampionMastery>>()
+            .await
+            .map_err(RiotApiError::Http)
+    }
 }
 
 pub fn account_by_riot_id_url(route: RegionalRoute, riot_id: &RiotId) -> String {
@@ -96,6 +123,15 @@ pub fn summoner_by_puuid_url(route: PlatformRoute, puuid: &str) -> String {
         "https://{}/lol/summoner/v4/summoners/by-puuid/{}",
         route.host(),
         encode_path_segment(puuid)
+    )
+}
+
+pub fn champion_mastery_top_url(route: PlatformRoute, puuid: &str, count: u8) -> String {
+    format!(
+        "https://{}/lol/champion-mastery/v4/champion-masteries/by-puuid/{}/top?count={}",
+        route.host(),
+        encode_path_segment(puuid),
+        count
     )
 }
 
@@ -131,6 +167,15 @@ pub struct RiotSummoner {
     pub profile_icon_id: u32,
     pub revision_date: Option<i64>,
     pub summoner_level: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RiotChampionMastery {
+    pub champion_id: u32,
+    pub champion_level: u32,
+    pub champion_points: u32,
+    pub last_play_time: Option<i64>,
 }
 
 #[derive(Debug)]
@@ -200,6 +245,14 @@ mod tests {
     }
 
     #[test]
+    fn builds_champion_mastery_top_url_for_platform() {
+        assert_eq!(
+            champion_mastery_top_url(PlatformRoute::Euw1, "puuid value", 5),
+            "https://euw1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/puuid%20value/top?count=5"
+        );
+    }
+
+    #[test]
     fn deserializes_riot_account_response() {
         let json = r#"{
             "puuid": "abc",
@@ -257,5 +310,26 @@ mod tests {
         assert_eq!(summoner.puuid, "abc");
         assert_eq!(summoner.profile_icon_id, 588);
         assert_eq!(summoner.summoner_level, 175);
+    }
+
+    #[test]
+    fn deserializes_champion_mastery_response() {
+        let json = r#"{
+            "championId": 266,
+            "championLevel": 7,
+            "championPoints": 123456
+        }"#;
+
+        let mastery = serde_json::from_str::<RiotChampionMastery>(json).unwrap();
+
+        assert_eq!(
+            mastery,
+            RiotChampionMastery {
+                champion_id: 266,
+                champion_level: 7,
+                champion_points: 123456,
+                last_play_time: None,
+            }
+        );
     }
 }

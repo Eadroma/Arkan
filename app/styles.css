@@ -570,7 +570,8 @@ button[type="submit"]:hover {
 }
 
 .empty-lines,
-.match-table {
+.match-table,
+.champion-list {
   display: grid;
   gap: 12px;
   margin-top: 24px;
@@ -596,6 +597,47 @@ button[type="submit"]:hover {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
   background: rgb(255 255 255 / 3%);
+}
+
+.champion-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+}
+
+.champion-row img {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.champion-row div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.champion-row strong,
+.champion-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.champion-row strong {
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 740;
+}
+
+.champion-row span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 620;
 }
 
 @media (max-width: 1080px) {
