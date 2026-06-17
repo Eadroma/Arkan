@@ -31,6 +31,8 @@ struct RiotAccountResponse {
     puuid: String,
     game_name: String,
     tag_line: String,
+    profile_icon_id: Option<u32>,
+    summoner_level: Option<u32>,
 }
 
 #[tauri::command]
@@ -48,11 +50,17 @@ async fn resolve_riot_account(input: &str, platform: &str) -> Result<RiotAccount
         .account_by_riot_id(platform.regional_route(), &riot_id)
         .await
         .map_err(|error| error.to_string())?;
+    let summoner = client
+        .summoner_by_puuid(platform, &account.puuid)
+        .await
+        .ok();
 
     Ok(RiotAccountResponse {
         puuid: account.puuid,
         game_name: account.game_name,
         tag_line: account.tag_line,
+        profile_icon_id: summoner.as_ref().map(|summoner| summoner.profile_icon_id),
+        summoner_level: summoner.as_ref().map(|summoner| summoner.summoner_level),
     })
 }
 

@@ -114,8 +114,9 @@ async function handleManualSearch(event) {
         pill: "Resolved",
         status: "Resolved",
         region,
-        level: "--",
+        level: account.summonerLevel ?? "--",
       });
+      setProfileIcon(account.profileIconId);
     } catch (error) {
       setLeagueClientState({
         variant: "warning",

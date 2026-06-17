@@ -1,6 +1,7 @@
 use arkan_core::{
     AppConfig, LeagueClientLockfile, PlatformRoute, PlayerRecord, RegionalRoute, RiotId,
-    account_by_riot_id_url, find_player_by_puuid, migrate, schema_version, upsert_player,
+    account_by_riot_id_url, find_player_by_puuid, migrate, schema_version, summoner_by_puuid_url,
+    upsert_player,
 };
 
 #[test]
@@ -48,6 +49,14 @@ fn riot_account_url_uses_region_derived_from_platform() {
     assert_eq!(
         account_by_riot_id_url(platform.regional_route(), &riot_id),
         "https://europe.api.riotgames.com/riot/account/v1/accounts/by-riot-id/PrincesseMargaux/9096"
+    );
+}
+
+#[test]
+fn riot_summoner_url_uses_platform_route() {
+    assert_eq!(
+        summoner_by_puuid_url(PlatformRoute::Euw1, "puuid-local"),
+        "https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/puuid-local"
     );
 }
 

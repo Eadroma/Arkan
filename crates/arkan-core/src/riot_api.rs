@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 
 use serde::Deserialize;
 
-use crate::{RegionalRoute, RiotId};
+use crate::{PlatformRoute, RegionalRoute, RiotId};
 
 #[derive(Debug, Clone)]
 pub struct RiotApiClient {
@@ -54,6 +54,32 @@ impl RiotApiClient {
             .await
             .map_err(RiotApiError::Http)
     }
+
+    pub async fn summoner_by_puuid(
+        &self,
+        route: PlatformRoute,
+        puuid: &str,
+    ) -> Result<RiotSummoner, RiotApiError> {
+        let url = summoner_by_puuid_url(route, puuid);
+        let response = self
+            .http
+            .get(url)
+            .header("X-Riot-Token", &self.api_key)
+            .send()
+            .await
+            .map_err(RiotApiError::Http)?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            return Err(RiotApiError::RiotStatus(status.as_u16()));
+        }
+
+        response
+            .json::<RiotSummoner>()
+            .await
+            .map_err(RiotApiError::Http)
+    }
 }
 
 pub fn account_by_riot_id_url(route: RegionalRoute, riot_id: &RiotId) -> String {
@@ -62,6 +88,14 @@ pub fn account_by_riot_id_url(route: RegionalRoute, riot_id: &RiotId) -> String 
         route.host(),
         encode_path_segment(riot_id.game_name()),
         encode_path_segment(riot_id.tag_line())
+    )
+}
+
+pub fn summoner_by_puuid_url(route: PlatformRoute, puuid: &str) -> String {
+    format!(
+        "https://{}/lol/summoner/v4/summoners/by-puuid/{}",
+        route.host(),
+        encode_path_segment(puuid)
     )
 }
 
@@ -86,6 +120,16 @@ pub struct RiotAccount {
     pub puuid: String,
     pub game_name: String,
     pub tag_line: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RiotSummoner {
+    pub id: String,
+    pub account_id: String,
+    pub puuid: String,
+    pub profile_icon_id: u32,
+    pub summoner_level: u32,
 }
 
 #[derive(Debug)]
@@ -147,6 +191,14 @@ mod tests {
     }
 
     #[test]
+    fn builds_summoner_by_puuid_url_for_platform() {
+        assert_eq!(
+            summoner_by_puuid_url(PlatformRoute::Euw1, "puuid value"),
+            "https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/puuid%20value"
+        );
+    }
+
+    #[test]
     fn deserializes_riot_account_response() {
         let json = r#"{
             "puuid": "abc",
@@ -162,6 +214,30 @@ mod tests {
                 puuid: "abc".to_owned(),
                 game_name: "PrincesseMargaux".to_owned(),
                 tag_line: "9096".to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn deserializes_riot_summoner_response() {
+        let json = r#"{
+            "id": "summoner-id",
+            "accountId": "account-id",
+            "puuid": "abc",
+            "profileIconId": 588,
+            "summonerLevel": 175
+        }"#;
+
+        let summoner = serde_json::from_str::<RiotSummoner>(json).unwrap();
+
+        assert_eq!(
+            summoner,
+            RiotSummoner {
+                id: "summoner-id".to_owned(),
+                account_id: "account-id".to_owned(),
+                puuid: "abc".to_owned(),
+                profile_icon_id: 588,
+                summoner_level: 175,
             }
         );
     }
