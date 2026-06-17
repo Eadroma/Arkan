@@ -437,9 +437,9 @@ button[type="submit"]:hover {
 }
 
 .section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   gap: 16px;
 }
 
@@ -450,9 +450,16 @@ button[type="submit"]:hover {
   line-height: 1.1;
 }
 
+.champion-filters {
+  display: grid;
+  grid-template-columns: 260px 140px 110px 110px;
+  gap: 8px;
+  align-items: center;
+}
+
 .catalog-search {
   position: relative;
-  width: min(320px, 100%);
+  min-width: 0;
 }
 
 .hero-stats {
@@ -666,7 +673,12 @@ button[type="submit"]:hover {
 .champion-catalog {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  align-content: start;
   gap: 10px;
+  min-height: 0;
+  max-height: calc(100vh - 174px);
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .champion-tile {
@@ -729,5 +741,10 @@ button[type="submit"]:hover {
 
   .hero-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .section-head,
+  .champion-filters {
+    grid-template-columns: 1fr;
   }
 }

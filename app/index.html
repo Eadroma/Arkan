@@ -149,9 +149,22 @@
               <p class="panel-kicker">Data Dragon</p>
               <h2>Champions</h2>
             </div>
-            <div class="catalog-search">
-              <span class="search-glyph" aria-hidden="true"></span>
-              <input aria-label="Filtrer les champions" placeholder="Chercher un champion" data-champion-search />
+            <div class="champion-filters">
+              <div class="catalog-search">
+                <span class="search-glyph" aria-hidden="true"></span>
+                <input aria-label="Filtrer les champions" placeholder="Chercher un champion" data-champion-search />
+              </div>
+              <select aria-label="Filtrer par role" data-champion-role>
+                <option value="all">Tous roles</option>
+                <option value="Assassin">Assassin</option>
+                <option value="Fighter">Combattant</option>
+                <option value="Mage">Mage</option>
+                <option value="Marksman">Tireur</option>
+                <option value="Support">Support</option>
+                <option value="Tank">Tank</option>
+              </select>
+              <input aria-label="Winrate minimum" placeholder="Winrate %" disabled title="A connecter aux stats de matchs" />
+              <input aria-label="Pickrate minimum" placeholder="Pickrate %" disabled title="A connecter aux stats de matchs" />
             </div>
           </section>
 

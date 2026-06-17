@@ -20,6 +20,7 @@ const profileToolbar = document.querySelector("[data-profile-toolbar]");
 const navItems = [...document.querySelectorAll("[data-nav-view]")];
 const viewPanels = [...document.querySelectorAll("[data-view-panel]")];
 const championSearch = document.querySelector("[data-champion-search]");
+const championRole = document.querySelector("[data-champion-role]");
 const championCatalog = document.querySelector("[data-champion-catalog]");
 let championCatalogItems = [];
 
@@ -40,6 +41,7 @@ toggle.addEventListener("click", () => {
 brandHome.addEventListener("click", handleConnectedPlayerReset);
 searchForm.addEventListener("submit", handleManualSearch);
 championSearch.addEventListener("input", () => renderChampionCatalog(championSearch.value));
+championRole.addEventListener("change", () => renderChampionCatalog(championSearch.value));
 navItems.forEach((item) => {
   item.addEventListener("click", (event) => {
     event.preventDefault();
@@ -393,6 +395,7 @@ async function loadChampionIndex() {
       {
         name: champion.name,
         title: champion.title,
+        tags: champion.tags,
         iconUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${champion.image.full}`,
       },
     ]),
@@ -433,8 +436,10 @@ async function loadChampionCatalog() {
 
 function renderChampionCatalog(query = "") {
   const normalizedQuery = query.trim().toLocaleLowerCase("fr");
+  const selectedRole = championRole.value;
   const champions = championCatalogItems.filter((champion) =>
-    champion.name.toLocaleLowerCase("fr").includes(normalizedQuery),
+    champion.name.toLocaleLowerCase("fr").includes(normalizedQuery) &&
+    (selectedRole === "all" || champion.tags.includes(selectedRole)),
   );
 
   championCatalog.replaceChildren(
