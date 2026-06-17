@@ -82,6 +82,16 @@ struct CurrentSummoner {
     summoner_level: Option<u32>,
 }
 
+impl CurrentSummoner {
+    fn has_visible_identity(&self) -> bool {
+        (!self.display_name.trim().is_empty() && self.display_name != "Connected summoner")
+            || self
+                .game_name
+                .as_deref()
+                .is_some_and(|game_name| !game_name.trim().is_empty())
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct LcuCurrentSummoner {
@@ -92,6 +102,34 @@ struct LcuCurrentSummoner {
     summoner_id: Option<u64>,
     profile_icon_id: Option<u32>,
     summoner_level: Option<u32>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LcuChatMe {
+    game_name: Option<String>,
+    game_tag: Option<String>,
+    name: Option<String>,
+    pid: Option<String>,
+    puuid: Option<String>,
+    summoner_id: Option<LcuNumericId>,
+    icon: Option<LcuNumericId>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(untagged)]
+enum LcuNumericId {
+    Number(u64),
+    Text(String),
+}
+
+impl LcuNumericId {
+    fn as_u64(&self) -> Option<u64> {
+        match self {
+            Self::Number(value) => Some(*value),
+            Self::Text(value) => value.parse::<u64>().ok(),
+        }
+    }
 }
 
 #[tauri::command]
@@ -278,11 +316,28 @@ fn persist_current_summoner_at(path: &Path, summoner: &CurrentSummoner) -> Resul
 async fn fetch_current_summoner(
     lockfile: &arkan_core::LeagueClientLockfile,
 ) -> Result<CurrentSummoner, String> {
-    let url = format!("{}/lol-summoner/v1/current-summoner", lockfile.base_url());
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
         .build()
         .map_err(|error| format!("failed to create LCU HTTP client: {error}"))?;
+    let current_result = fetch_current_summoner_endpoint(&client, lockfile).await;
+
+    match current_result {
+        Ok(summoner) if summoner.has_visible_identity() => Ok(summoner),
+        Ok(summoner) => fetch_chat_profile_endpoint(&client, lockfile)
+            .await
+            .or(Ok(summoner)),
+        Err(current_error) => fetch_chat_profile_endpoint(&client, lockfile)
+            .await
+            .map_err(|chat_error| format!("{current_error}; fallback failed: {chat_error}")),
+    }
+}
+
+async fn fetch_current_summoner_endpoint(
+    client: &reqwest::Client,
+    lockfile: &arkan_core::LeagueClientLockfile,
+) -> Result<CurrentSummoner, String> {
+    let url = format!("{}/lol-summoner/v1/current-summoner", lockfile.base_url());
 
     let response = client
         .get(url)
@@ -315,6 +370,66 @@ async fn fetch_current_summoner(
         profile_icon_id: summoner.profile_icon_id,
         summoner_level: summoner.summoner_level,
     })
+}
+
+async fn fetch_chat_profile_endpoint(
+    client: &reqwest::Client,
+    lockfile: &arkan_core::LeagueClientLockfile,
+) -> Result<CurrentSummoner, String> {
+    let url = format!("{}/lol-chat/v1/me", lockfile.base_url());
+    let response = client
+        .get(url)
+        .basic_auth("riot", Some(lockfile.password()))
+        .send()
+        .await
+        .map_err(|error| format!("failed to call League Client chat API: {error}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "League Client chat API returned HTTP {}",
+            response.status()
+        ));
+    }
+
+    let chat_profile = response
+        .json::<LcuChatMe>()
+        .await
+        .map_err(|error| format!("failed to parse League Client chat profile: {error}"))?;
+
+    Ok(current_summoner_from_chat_profile(chat_profile))
+}
+
+fn current_summoner_from_chat_profile(chat_profile: LcuChatMe) -> CurrentSummoner {
+    let display_name = chat_profile
+        .name
+        .clone()
+        .or_else(|| {
+            chat_profile
+                .game_name
+                .as_ref()
+                .zip(chat_profile.game_tag.as_ref())
+                .map(|(game_name, game_tag)| format!("{game_name}#{game_tag}"))
+        })
+        .or(chat_profile.pid.clone())
+        .or(chat_profile.game_name.clone())
+        .unwrap_or_else(|| "Connected summoner".to_owned());
+
+    CurrentSummoner {
+        display_name,
+        game_name: chat_profile.game_name,
+        tag_line: chat_profile.game_tag,
+        puuid: chat_profile.puuid,
+        summoner_id: chat_profile
+            .summoner_id
+            .as_ref()
+            .and_then(LcuNumericId::as_u64),
+        profile_icon_id: chat_profile
+            .icon
+            .as_ref()
+            .and_then(LcuNumericId::as_u64)
+            .and_then(|icon| u32::try_from(icon).ok()),
+        summoner_level: None,
+    }
 }
 
 fn main() {
@@ -376,5 +491,28 @@ mod tests {
         assert_eq!(player.profile_icon_id, Some(29));
 
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn builds_current_summoner_from_chat_profile_fallback() {
+        let chat_profile = LcuChatMe {
+            game_name: Some("PrincesseMargaux".to_owned()),
+            game_tag: Some("9096".to_owned()),
+            name: None,
+            pid: Some("PrincesseMargaux#9096".to_owned()),
+            puuid: Some("puuid-chat".to_owned()),
+            summoner_id: Some(LcuNumericId::Text("123456".to_owned())),
+            icon: Some(LcuNumericId::Number(29)),
+        };
+
+        let summoner = current_summoner_from_chat_profile(chat_profile);
+
+        assert_eq!(summoner.display_name, "PrincesseMargaux#9096");
+        assert_eq!(summoner.game_name.as_deref(), Some("PrincesseMargaux"));
+        assert_eq!(summoner.tag_line.as_deref(), Some("9096"));
+        assert_eq!(summoner.puuid.as_deref(), Some("puuid-chat"));
+        assert_eq!(summoner.summoner_id, Some(123456));
+        assert_eq!(summoner.profile_icon_id, Some(29));
+        assert_eq!(summoner.summoner_level, None);
     }
 }
