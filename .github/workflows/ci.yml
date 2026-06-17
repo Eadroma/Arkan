@@ -13,6 +13,30 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  frontend:
+    name: Frontend checks
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Typecheck frontend
+        run: bun run typecheck
+
+      - name: Run frontend tests
+        run: bun test
+
+      - name: Build frontend bundle
+        run: bun run build
+
   rust:
     name: Rust checks
     runs-on: windows-latest

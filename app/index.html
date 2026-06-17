@@ -176,6 +176,57 @@
             </div>
           </section>
         </section>
+
+        <section class="dashboard" data-view-panel="champion-detail" hidden>
+          <section class="champion-detail-hero">
+            <button class="text-button" type="button" data-champion-back>Retour</button>
+            <div class="champion-detail-heading">
+              <img data-champion-detail-icon alt="" />
+              <div>
+                <p class="panel-kicker" data-champion-detail-role>Champion</p>
+                <h2 data-champion-detail-name>Champion</h2>
+                <span data-champion-detail-title></span>
+              </div>
+            </div>
+            <select aria-label="Role champion" data-champion-detail-role-select></select>
+          </section>
+
+          <section class="champion-detail-grid">
+            <article class="surface-card compact-stat">
+              <span>Winrate</span>
+              <strong data-champion-winrate>--</strong>
+              <small data-champion-winrate-note>Aggregation MATCH-V5 requise</small>
+            </article>
+            <article class="surface-card compact-stat">
+              <span>Pickrate</span>
+              <strong data-champion-pickrate>--</strong>
+              <small data-champion-pickrate-note>Aggregation MATCH-V5 requise</small>
+            </article>
+            <article class="surface-card compact-stat">
+              <span>Sample</span>
+              <strong data-champion-sample>--</strong>
+              <small>Patch / queue a synchroniser</small>
+            </article>
+          </section>
+
+          <section class="cards-grid">
+            <article class="surface-card">
+              <div class="card-header">
+                <h3>Skill order recommande</h3>
+                <span class="muted" data-champion-skill-source>Timeline</span>
+              </div>
+              <div class="skill-order" data-champion-skill-order></div>
+            </article>
+
+            <article class="surface-card">
+              <div class="card-header">
+                <h3>Best build</h3>
+                <span class="muted" data-champion-build-source>Items</span>
+              </div>
+              <div class="build-list" data-champion-build></div>
+            </article>
+          </section>
+        </section>
       </section>
     </main>
   </body>

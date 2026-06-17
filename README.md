@@ -1,5 +1,7 @@
 # Arkan
 
+[![CI](https://github.com/Eadroma/Arkan/actions/workflows/ci.yml/badge.svg)](https://github.com/Eadroma/Arkan/actions/workflows/ci.yml)
+
 Arkan is a Rust-first desktop companion for League of Legends: a local-first player profile, match history, and progression analysis app inspired by tools like OP.GG and Blitz, built with a careful Riot API integration.
 
 The project starts with a focused MVP before expanding into live-client or overlay features:
@@ -27,6 +29,15 @@ docs                Product and technical docs
 
 ## Local Checks
 
+Frontend checks:
+
+```powershell
+bun install
+bun run typecheck
+bun test
+bun run build
+```
+
 ```powershell
 cargo test -p arkan-core
 ```
@@ -43,7 +54,7 @@ For the desktop shell:
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
-The GitHub Actions workflow runs formatting, core tests, and the Tauri shell check on Windows.
+The GitHub Actions workflow runs frontend typechecking/tests/build, Rust formatting, core tests, and the Tauri shell check on Windows.
 
 ## Local Configuration
 
