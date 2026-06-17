@@ -89,3 +89,14 @@ Update the ticket board with:
 - Commit: `8eecda7`
 - Commit URL: `https://github.com/Eadroma/Arkan/commit/8eecda7`
 - Notes: Clicking the Arkan logo now clears manual search state, shows a scanning state, and reruns automatic League Client detection to restore the initially connected player. Local validation passed: `node --check app/app.js`, `cargo fmt --all --check`, `cargo test -p arkan-core`, `cargo test --manifest-path src-tauri/Cargo.toml`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo build --manifest-path src-tauri/Cargo.toml`. App was relaunched for manual testing and the behavior was confirmed by the user.
+
+## 2026-06-17 - Local Riot API Key And Searched Player Icon
+
+Update the ticket board with:
+
+- Ticket: `Charger la cle Riot locale et afficher l'icone recherchee`
+- Status: `Done`
+- Branch: `codex/load-local-env-file`
+- Commits: `8ad1bdd`, `ab5f128`, `fc76129`
+- Commit URLs: `https://github.com/Eadroma/Arkan/commit/8ad1bdd`, `https://github.com/Eadroma/Arkan/commit/ab5f128`, `https://github.com/Eadroma/Arkan/commit/fc76129`
+- Notes: Added local `.env` fallback loading for `RIOT_API_KEY`, `ARKAN_DEFAULT_PLATFORM`, and `ARKAN_DEFAULT_LANGUAGE` while keeping `.env` ignored and out of Git. Manual Riot ID search now enriches ACCOUNT-V1 results with SUMMONER-V4 by PUUID, returning `profileIconId` and `summonerLevel` when available. The Riot summoner payload parser accepts minimal responses so missing optional fields do not prevent icon rendering. The UI now displays the searched player's profile icon and level via the existing Data Dragon icon renderer. Local validation passed: `node --check app/app.js`, `cargo fmt --all --check`, `cargo test -p arkan-core`, `cargo test --manifest-path src-tauri/Cargo.toml`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo build --manifest-path src-tauri/Cargo.toml`. App was relaunched for manual testing and the user confirmed the searched icon works. Security note: the local Riot API key is present only in ignored `.env`; recommend rotating the key after testing because it was shared in chat.
