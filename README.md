@@ -37,6 +37,14 @@ If the MSVC linker is not available yet, use:
 cargo check -p arkan-core
 ```
 
+For the desktop shell:
+
+```powershell
+cargo check --manifest-path src-tauri/Cargo.toml
+```
+
+The GitHub Actions workflow runs formatting, core tests, and the Tauri shell check on Windows.
+
 ## Local Configuration
 
 Runtime configuration is read from environment variables during early development:

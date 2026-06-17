@@ -1,0 +1,38 @@
+use arkan_core::{AppConfig, LeagueClientLockfile, PlatformRoute, RegionalRoute, RiotId};
+
+#[test]
+fn riot_id_display_round_trips_after_normalization() {
+    let riot_id = RiotId::parse("  PrincesseMargaux  #  9096  ").unwrap();
+
+    assert_eq!(riot_id.game_name(), "PrincesseMargaux");
+    assert_eq!(riot_id.tag_line(), "9096");
+    assert_eq!(riot_id.to_string(), "PrincesseMargaux#9096");
+}
+
+#[test]
+fn league_client_lockfile_keeps_credentials_private_by_default() {
+    let lockfile = LeagueClientLockfile::parse("LeagueClient:4120:65358:secret:https").unwrap();
+
+    assert_eq!(lockfile.process_name(), "LeagueClient");
+    assert_eq!(lockfile.process_id(), 4120);
+    assert_eq!(lockfile.port(), 65358);
+    assert_eq!(lockfile.protocol().to_string(), "https");
+    assert_eq!(lockfile.base_url(), "https://127.0.0.1:65358");
+}
+
+#[test]
+fn platform_routes_choose_the_match_v5_regional_route() {
+    assert_eq!(PlatformRoute::Euw1.regional_route(), RegionalRoute::Europe);
+    assert_eq!(PlatformRoute::Na1.regional_route(), RegionalRoute::Americas);
+    assert_eq!(PlatformRoute::Kr.regional_route(), RegionalRoute::Asia);
+    assert_eq!(PlatformRoute::Sg2.regional_route(), RegionalRoute::Sea);
+}
+
+#[test]
+fn app_config_defaults_are_good_for_current_project_region() {
+    let config = AppConfig::from_values(None, None, None).unwrap();
+
+    assert_eq!(config.default_platform(), PlatformRoute::Euw1);
+    assert_eq!(config.default_language(), "fr_FR");
+    assert!(!config.has_riot_api_key());
+}
