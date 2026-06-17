@@ -107,6 +107,86 @@ impl RiotApiClient {
             .await
             .map_err(RiotApiError::Http)
     }
+
+    pub async fn match_ids_by_puuid(
+        &self,
+        route: RegionalRoute,
+        puuid: &str,
+        start: u32,
+        count: u8,
+    ) -> Result<Vec<String>, RiotApiError> {
+        let url = match_ids_by_puuid_url(route, puuid, start, count);
+        let response = self
+            .http
+            .get(url)
+            .header("X-Riot-Token", &self.api_key)
+            .send()
+            .await
+            .map_err(RiotApiError::Http)?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            return Err(RiotApiError::RiotStatus(status.as_u16()));
+        }
+
+        response
+            .json::<Vec<String>>()
+            .await
+            .map_err(RiotApiError::Http)
+    }
+
+    pub async fn match_by_id(
+        &self,
+        route: RegionalRoute,
+        match_id: &str,
+    ) -> Result<serde_json::Value, RiotApiError> {
+        let url = match_by_id_url(route, match_id);
+        let response = self
+            .http
+            .get(url)
+            .header("X-Riot-Token", &self.api_key)
+            .send()
+            .await
+            .map_err(RiotApiError::Http)?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            return Err(RiotApiError::RiotStatus(status.as_u16()));
+        }
+
+        response
+            .json::<serde_json::Value>()
+            .await
+            .map_err(RiotApiError::Http)
+    }
+
+    pub async fn match_timeline_by_id(
+        &self,
+        route: RegionalRoute,
+        match_id: &str,
+    ) -> Result<serde_json::Value, RiotApiError> {
+        let url = match_timeline_by_id_url(route, match_id);
+        let response = self
+            .http
+            .get(url)
+            .header("X-Riot-Token", &self.api_key)
+            .send()
+            .await
+            .map_err(RiotApiError::Http)?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            return Err(RiotApiError::RiotStatus(status.as_u16()));
+        }
+
+        response
+            .json::<serde_json::Value>()
+            .await
+            .map_err(RiotApiError::Http)
+    }
 }
 
 pub fn account_by_riot_id_url(route: RegionalRoute, riot_id: &RiotId) -> String {
@@ -132,6 +212,32 @@ pub fn champion_mastery_top_url(route: PlatformRoute, puuid: &str, count: u8) ->
         route.host(),
         encode_path_segment(puuid),
         count
+    )
+}
+
+pub fn match_ids_by_puuid_url(route: RegionalRoute, puuid: &str, start: u32, count: u8) -> String {
+    format!(
+        "https://{}/lol/match/v5/matches/by-puuid/{}/ids?start={}&count={}",
+        route.host(),
+        encode_path_segment(puuid),
+        start,
+        count
+    )
+}
+
+pub fn match_by_id_url(route: RegionalRoute, match_id: &str) -> String {
+    format!(
+        "https://{}/lol/match/v5/matches/{}",
+        route.host(),
+        encode_path_segment(match_id)
+    )
+}
+
+pub fn match_timeline_by_id_url(route: RegionalRoute, match_id: &str) -> String {
+    format!(
+        "https://{}/lol/match/v5/matches/{}/timeline",
+        route.host(),
+        encode_path_segment(match_id)
     )
 }
 
@@ -249,6 +355,26 @@ mod tests {
         assert_eq!(
             champion_mastery_top_url(PlatformRoute::Euw1, "puuid value", 5),
             "https://euw1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/puuid%20value/top?count=5"
+        );
+    }
+
+    #[test]
+    fn builds_match_ids_by_puuid_url_for_regional_route() {
+        assert_eq!(
+            match_ids_by_puuid_url(RegionalRoute::Europe, "puuid value", 20, 10),
+            "https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/puuid%20value/ids?start=20&count=10"
+        );
+    }
+
+    #[test]
+    fn builds_match_detail_urls_for_regional_route() {
+        assert_eq!(
+            match_by_id_url(RegionalRoute::Europe, "EUW1_123"),
+            "https://europe.api.riotgames.com/lol/match/v5/matches/EUW1_123"
+        );
+        assert_eq!(
+            match_timeline_by_id_url(RegionalRoute::Europe, "EUW1_123"),
+            "https://europe.api.riotgames.com/lol/match/v5/matches/EUW1_123/timeline"
         );
     }
 

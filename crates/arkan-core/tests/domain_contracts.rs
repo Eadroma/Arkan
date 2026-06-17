@@ -1,7 +1,8 @@
 use arkan_core::{
-    AppConfig, LeagueClientLockfile, PlatformRoute, PlayerRecord, RegionalRoute, RiotId,
-    account_by_riot_id_url, champion_mastery_top_url, find_player_by_puuid, migrate,
-    schema_version, summoner_by_puuid_url, upsert_player,
+    AppConfig, ChampionRoleStats, LeagueClientLockfile, PlatformRoute, PlayerRecord, RegionalRoute,
+    RiotId, account_by_riot_id_url, champion_mastery_top_url, find_champion_role_stats,
+    find_player_by_puuid, match_by_id_url, match_ids_by_puuid_url, match_timeline_by_id_url,
+    migrate, schema_version, summoner_by_puuid_url, upsert_champion_role_stats, upsert_player,
 };
 
 #[test]
@@ -69,6 +70,22 @@ fn champion_mastery_top_url_uses_platform_route() {
 }
 
 #[test]
+fn match_v5_urls_use_regional_route() {
+    assert_eq!(
+        match_ids_by_puuid_url(RegionalRoute::Europe, "puuid-local", 0, 20),
+        "https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/puuid-local/ids?start=0&count=20"
+    );
+    assert_eq!(
+        match_by_id_url(RegionalRoute::Europe, "EUW1_123"),
+        "https://europe.api.riotgames.com/lol/match/v5/matches/EUW1_123"
+    );
+    assert_eq!(
+        match_timeline_by_id_url(RegionalRoute::Europe, "EUW1_123"),
+        "https://europe.api.riotgames.com/lol/match/v5/matches/EUW1_123/timeline"
+    );
+}
+
+#[test]
 fn sqlite_schema_can_store_detected_player_identity() {
     let mut connection = rusqlite::Connection::open_in_memory().unwrap();
     migrate(&mut connection).unwrap();
@@ -86,9 +103,38 @@ fn sqlite_schema_can_store_detected_player_identity() {
 
     upsert_player(&connection, &player).unwrap();
 
-    assert_eq!(schema_version(&connection).unwrap(), 1);
+    assert_eq!(schema_version(&connection).unwrap(), 2);
     assert_eq!(
         find_player_by_puuid(&connection, "puuid-local").unwrap(),
         Some(player)
+    );
+}
+
+#[test]
+fn sqlite_schema_can_store_champion_role_aggregates() {
+    let mut connection = rusqlite::Connection::open_in_memory().unwrap();
+    migrate(&mut connection).unwrap();
+
+    let stats = ChampionRoleStats {
+        champion_id: 29,
+        champion_key: "Twitch".to_owned(),
+        champion_name: "Twitch".to_owned(),
+        role: "BOTTOM".to_owned(),
+        patch: "16.12".to_owned(),
+        platform_id: "EUW1".to_owned(),
+        queue_id: 420,
+        tier: None,
+        sample_size: 80,
+        wins: 42,
+        win_rate: 52.5,
+        pick_rate: 3.9,
+        source: "riot-match-v5".to_owned(),
+    };
+
+    upsert_champion_role_stats(&connection, &stats).unwrap();
+
+    assert_eq!(
+        find_champion_role_stats(&connection, 29, "BOTTOM", "16.12", "EUW1", 420, None).unwrap(),
+        Some(stats)
     );
 }
