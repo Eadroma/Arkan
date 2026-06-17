@@ -78,3 +78,14 @@ Update the ticket board with:
 - Commit: `53aa48e`
 - Commit URL: `https://github.com/Eadroma/Arkan/commit/53aa48e`
 - Notes: The top search form now handles submit events, validates empty and malformed Riot IDs, shows loading/invalid/config states in the player hero and League Client card, and calls `resolve_riot_account` when a Riot API key is configured. Added visible badge states for loading, warning, error, and offline. Local validation passed: `cargo fmt --all --check`, `cargo test -p arkan-core`, `cargo test --manifest-path src-tauri/Cargo.toml`, `cargo check --manifest-path src-tauri/Cargo.toml`, `node --check app/app.js`, and `cargo build --manifest-path src-tauri/Cargo.toml`. App was relaunched for manual testing.
+
+## 2026-06-17 - Logo Reset To Connected Player
+
+Update the ticket board with:
+
+- Ticket: `Retour au joueur connecte via le logo`
+- Status: `Done`
+- Branch: `codex/logo-reset-connected-player`
+- Commit: `8eecda7`
+- Commit URL: `https://github.com/Eadroma/Arkan/commit/8eecda7`
+- Notes: Clicking the Arkan logo now clears manual search state, shows a scanning state, and reruns automatic League Client detection to restore the initially connected player. Local validation passed: `node --check app/app.js`, `cargo fmt --all --check`, `cargo test -p arkan-core`, `cargo test --manifest-path src-tauri/Cargo.toml`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo build --manifest-path src-tauri/Cargo.toml`. App was relaunched for manual testing and the behavior was confirmed by the user.
