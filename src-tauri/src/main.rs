@@ -27,6 +27,37 @@ fn config_status() -> Result<String, String> {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct RiotAccountResponse {
+    puuid: String,
+    game_name: String,
+    tag_line: String,
+}
+
+#[tauri::command]
+async fn resolve_riot_account(input: &str, platform: &str) -> Result<RiotAccountResponse, String> {
+    let config = arkan_core::AppConfig::from_env().map_err(|error| error.to_string())?;
+    let api_key = config
+        .riot_api_key()
+        .ok_or_else(|| "Riot API key is missing".to_owned())?;
+    let riot_id = arkan_core::RiotId::parse(input).map_err(|error| error.to_string())?;
+    let platform = platform
+        .parse::<arkan_core::PlatformRoute>()
+        .map_err(|error| error.to_string())?;
+    let client = arkan_core::RiotApiClient::new(api_key).map_err(|error| error.to_string())?;
+    let account = client
+        .account_by_riot_id(platform.regional_route(), &riot_id)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    Ok(RiotAccountResponse {
+        puuid: account.puuid,
+        game_name: account.game_name,
+        tag_line: account.tag_line,
+    })
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct LeagueClientStatus {
     detected: bool,
     connected: bool,
@@ -191,6 +222,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             parse_riot_id,
             config_status,
+            resolve_riot_account,
             league_client_status
         ])
         .run(tauri::generate_context!())

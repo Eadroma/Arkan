@@ -1,4 +1,6 @@
-use arkan_core::{AppConfig, LeagueClientLockfile, PlatformRoute, RegionalRoute, RiotId};
+use arkan_core::{
+    AppConfig, LeagueClientLockfile, PlatformRoute, RegionalRoute, RiotId, account_by_riot_id_url,
+};
 
 #[test]
 fn riot_id_display_round_trips_after_normalization() {
@@ -35,4 +37,15 @@ fn app_config_defaults_are_good_for_current_project_region() {
     assert_eq!(config.default_platform(), PlatformRoute::Euw1);
     assert_eq!(config.default_language(), "fr_FR");
     assert!(!config.has_riot_api_key());
+}
+
+#[test]
+fn riot_account_url_uses_region_derived_from_platform() {
+    let riot_id = RiotId::parse("PrincesseMargaux#9096").unwrap();
+    let platform = PlatformRoute::Euw1;
+
+    assert_eq!(
+        account_by_riot_id_url(platform.regional_route(), &riot_id),
+        "https://europe.api.riotgames.com/riot/account/v1/accounts/by-riot-id/PrincesseMargaux/9096"
+    );
 }
