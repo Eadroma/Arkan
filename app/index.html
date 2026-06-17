@@ -177,51 +177,150 @@
           </section>
         </section>
 
-        <section class="dashboard" data-view-panel="champion-detail" hidden>
-          <section class="champion-detail-hero">
+        <section class="dashboard champion-build-page" data-view-panel="champion-detail" hidden>
+          <section class="build-hero">
             <button class="text-button" type="button" data-champion-back>Retour</button>
-            <div class="champion-detail-heading">
-              <img data-champion-detail-icon alt="" />
-              <div>
-                <p class="panel-kicker" data-champion-detail-role>Champion</p>
-                <h2 data-champion-detail-name>Champion</h2>
-                <span data-champion-detail-title></span>
+            <div class="build-hero-main">
+              <img class="build-portrait" data-champion-detail-icon alt="" />
+              <div class="build-title-block">
+                <div class="build-title-row">
+                  <span class="tier-badge">A</span>
+                  <h2><span data-champion-detail-name>Champion</span> Build for <span data-champion-detail-role>Role</span></h2>
+                  <span class="patch-badge">Patch 26.12</span>
+                </div>
+                <p data-champion-detail-title></p>
+                <div class="ability-strip" data-champion-abilities></div>
               </div>
             </div>
+          </section>
+
+          <nav class="build-tabs" aria-label="Champion build tabs">
+            <button class="active" type="button">Build</button>
+            <button type="button">ARAM</button>
+            <button type="button">Counters</button>
+            <button type="button">Leaderboards</button>
+            <button type="button">More Stats</button>
+          </nav>
+
+          <section class="build-filter-bar">
+            <span>Filters</span>
             <select aria-label="Role champion" data-champion-detail-role-select></select>
+            <select aria-label="Rank filter">
+              <option>Emerald +</option>
+              <option>Diamond +</option>
+              <option>Master +</option>
+            </select>
+            <select aria-label="Queue filter">
+              <option>Ranked Solo/Duo</option>
+              <option>Normal Draft</option>
+            </select>
+            <button class="text-button" type="button">More...</button>
           </section>
 
-          <section class="champion-detail-grid">
-            <article class="surface-card compact-stat">
-              <span>Winrate</span>
+          <section class="build-stat-strip">
+            <article>
+              <span>Tier</span>
+              <strong>A</strong>
+            </article>
+            <article>
+              <span>Win Rate</span>
               <strong data-champion-winrate>--</strong>
-              <small data-champion-winrate-note>Aggregation MATCH-V5 requise</small>
             </article>
-            <article class="surface-card compact-stat">
-              <span>Pickrate</span>
+            <article>
+              <span>Rank</span>
+              <strong>-- / --</strong>
+            </article>
+            <article>
+              <span>Pick Rate</span>
               <strong data-champion-pickrate>--</strong>
-              <small data-champion-pickrate-note>Aggregation MATCH-V5 requise</small>
             </article>
-            <article class="surface-card compact-stat">
-              <span>Sample</span>
-              <strong data-champion-sample>--</strong>
-              <small>Patch / queue a synchroniser</small>
+            <article>
+              <span>Ban Rate</span>
+              <strong>--</strong>
+            </article>
+            <article>
+              <span>Matches</span>
+              <strong data-champion-sample>0</strong>
             </article>
           </section>
 
-          <section class="cards-grid">
-            <article class="surface-card">
-              <div class="card-header">
-                <h3>Skill order recommande</h3>
-                <span class="muted" data-champion-skill-source>Timeline</span>
+          <section class="build-layout">
+            <article class="build-module runes-module">
+              <div class="module-header">
+                <h3>Recommended</h3>
+                <strong>Runes</strong>
+              </div>
+              <div class="rune-board">
+                <div class="rune-column">
+                  <span>Primary</span>
+                  <div class="rune-grid">
+                    <i data-active="true"></i><i></i><i></i>
+                    <i></i><i data-active="true"></i><i></i>
+                    <i></i><i></i><i data-active="true"></i>
+                    <i data-active="true"></i><i></i><i></i>
+                  </div>
+                </div>
+                <div class="rune-column">
+                  <span>Secondary</span>
+                  <div class="rune-grid compact">
+                    <i></i><i data-active="true"></i><i></i>
+                    <i data-active="true"></i><i></i><i></i>
+                    <i></i><i></i><i data-active="true"></i>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="build-module spells-module">
+              <div class="module-header">
+                <h3>Summoner Spells</h3>
+                <strong>-- WR</strong>
+              </div>
+              <div class="spell-pair">
+                <span>Flash</span>
+                <span>Ignite</span>
+              </div>
+            </article>
+
+            <article class="build-module side-promo">
+              <strong>Personal Stats</strong>
+              <span>Brancher les agregats MATCH-V5 debloquera les stats de build reelles.</span>
+            </article>
+
+            <article class="build-module wide matchups-module">
+              <div class="module-header">
+                <h3>Toughest Matchups</h3>
+                <span>Ces champions counter le pick</span>
+              </div>
+              <div class="matchup-list">
+                <div><span>?</span><strong>--%</strong><small>0 Games</small></div>
+                <div><span>?</span><strong>--%</strong><small>0 Games</small></div>
+                <div><span>?</span><strong>--%</strong><small>0 Games</small></div>
+                <div><span>?</span><strong>--%</strong><small>0 Games</small></div>
+                <div><span>?</span><strong>--%</strong><small>0 Games</small></div>
+              </div>
+            </article>
+
+            <article class="build-module skill-priority">
+              <div class="module-header">
+                <h3>Skill Priority</h3>
+                <strong>-- WR</strong>
+              </div>
+              <div class="skill-priority-icons" data-champion-skill-priority></div>
+            </article>
+
+            <article class="build-module skill-path-module">
+              <div class="module-header">
+                <h3>Skill Path</h3>
+                <span>Most popular ability leveling order</span>
               </div>
               <div class="skill-order" data-champion-skill-order></div>
             </article>
 
-            <article class="surface-card">
-              <div class="card-header">
-                <h3>Best build</h3>
-                <span class="muted" data-champion-build-source>Items</span>
+            <article class="build-module wide items-module">
+              <div class="module-header">
+                <h3>Best Build</h3>
+                <span>Items by phase</span>
               </div>
               <div class="build-list" data-champion-build></div>
             </article>

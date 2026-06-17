@@ -64,12 +64,14 @@ type DataDragonChampion = {
   image: {
     full: string;
   };
-  spells?: Array<{ name: string }>;
+  passive?: { name: string; image?: { full: string } };
+  spells?: Array<{ name: string; image?: { full: string } }>;
   recommended?: Array<{ blocks?: Array<{ items?: Array<{ id: string }> }> }>;
 };
 
 type ChampionDetail = ChampionSummary & {
-  spells: Array<{ name: string }>;
+  passive?: { name: string; image?: { full: string } };
+  spells: Array<{ name: string; image?: { full: string } }>;
   recommended: Array<{ blocks?: Array<{ items?: Array<{ id: string }> }> }>;
 };
 
@@ -107,15 +109,18 @@ const viewPanels = [...document.querySelectorAll<HTMLElement>("[data-view-panel]
 const championSearch = requiredElement<HTMLInputElement>("[data-champion-search]");
 const championRole = requiredElement<HTMLSelectElement>("[data-champion-role]");
 const championCatalog = requiredElement<HTMLElement>("[data-champion-catalog]");
+const championBuildHero = requiredElement<HTMLElement>(".build-hero");
 const championBack = requiredElement<HTMLButtonElement>("[data-champion-back]");
 const championDetailIcon = requiredElement<HTMLImageElement>("[data-champion-detail-icon]");
 const championDetailRole = requiredElement<HTMLElement>("[data-champion-detail-role]");
 const championDetailName = requiredElement<HTMLElement>("[data-champion-detail-name]");
 const championDetailTitle = requiredElement<HTMLElement>("[data-champion-detail-title]");
 const championDetailRoleSelect = requiredElement<HTMLSelectElement>("[data-champion-detail-role-select]");
+const championAbilities = requiredElement<HTMLElement>("[data-champion-abilities]");
 const championWinrate = requiredElement<HTMLElement>("[data-champion-winrate]");
 const championPickrate = requiredElement<HTMLElement>("[data-champion-pickrate]");
 const championSample = requiredElement<HTMLElement>("[data-champion-sample]");
+const championSkillPriority = requiredElement<HTMLElement>("[data-champion-skill-priority]");
 const championSkillOrder = requiredElement<HTMLElement>("[data-champion-skill-order]");
 const championBuild = requiredElement<HTMLElement>("[data-champion-build]");
 
@@ -148,7 +153,7 @@ championDetailRoleSelect.addEventListener("change", () => {
 });
 
 navItems.forEach((item) => {
-  item.addEventListener("click", (event) => {
+  item.addEventListener("click", (event: MouseEvent) => {
     event.preventDefault();
     setActiveView(item.dataset.navView as ViewName);
   });
@@ -476,6 +481,7 @@ async function loadChampionIndex(): Promise<Map<string, ChampionDetail>> {
         name: champion.name,
         title: champion.title,
         tags: champion.tags,
+        passive: champion.passive,
         spells: champion.spells ?? [],
         recommended: champion.recommended ?? [],
         iconUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${champion.image.full}`,
@@ -543,6 +549,7 @@ function renderChampionCatalog(query = ""): void {
 }
 
 async function openChampionDetail(championId: string): Promise<void> {
+  await loadChampionCatalog();
   const champion = await loadChampionDetail(championId);
   selectedChampion = champion;
   renderChampionDetail(champion, champion.tags[0] ?? "ALL");
@@ -567,6 +574,7 @@ async function loadChampionDetail(championId: string): Promise<ChampionDetail> {
   const detailedChampion = details.data[champion.id];
   const hydratedChampion: ChampionDetail = {
     ...champion,
+    passive: detailedChampion.passive,
     spells: detailedChampion.spells ?? [],
     recommended: detailedChampion.recommended ?? [],
   };
@@ -580,6 +588,10 @@ function renderChampionDetail(champion: ChampionDetail, role: string): void {
   championDetailName.textContent = champion.name;
   championDetailTitle.textContent = champion.title;
   championDetailRole.textContent = roleLabel(role);
+  championBuildHero.style.setProperty(
+    "--champion-splash",
+    `url("https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion.id}_0.jpg")`,
+  );
   championWinrate.textContent = "--";
   championPickrate.textContent = "--";
   championSample.textContent = "0";
@@ -594,23 +606,83 @@ function renderChampionDetail(champion: ChampionDetail, role: string): void {
     }),
   );
 
+  renderAbilityStrip(champion);
   renderSkillOrder(champion);
   renderBuild(champion);
 }
 
+function renderAbilityStrip(champion: ChampionDetail): void {
+  const abilities = [
+    { key: "P", name: champion.passive?.name ?? "Passive", image: champion.passive?.image?.full, passive: true },
+    ...champion.spells.map((spell, index) => ({
+      key: ["Q", "W", "E", "R"][index] ?? "?",
+      name: spell.name,
+      image: spell.image?.full,
+      passive: false,
+    })),
+  ];
+
+  championAbilities.replaceChildren(
+    ...abilities.map((ability) => {
+      const item = document.createElement("div");
+      const img = document.createElement("img");
+      const key = document.createElement("span");
+      const imagePath = ability.passive ? "passive" : "spell";
+
+      item.className = "ability-chip";
+      img.alt = ability.name;
+      img.src = ability.image
+        ? `https://ddragon.leagueoflegends.com/cdn/${champion.version}/img/${imagePath}/${ability.image}`
+        : champion.iconUrl;
+      key.textContent = ability.key;
+      item.append(img, key);
+      return item;
+    }),
+  );
+}
+
 function renderSkillOrder(champion: ChampionDetail): void {
   const primarySpells = champion.spells.slice(0, 3);
+  const skillPath = ["Q", "E", "W", "Q", "Q", "R", "Q", "W", "Q", "W", "R", "W", "W", "E", "E", "R", "E", "E"];
+  const skillIcons = primarySpells.map((spell, index) => ({ spell, key: ["Q", "W", "E"][index] ?? "?" }));
+
+  championSkillPriority.replaceChildren(
+    ...skillIcons.map(({ spell, key }) => {
+      const item = document.createElement("div");
+      const img = document.createElement("img");
+      const label = document.createElement("span");
+
+      item.className = "priority-icon";
+      img.alt = spell.name;
+      img.src = spell.image?.full
+        ? `https://ddragon.leagueoflegends.com/cdn/${champion.version}/img/spell/${spell.image.full}`
+        : champion.iconUrl;
+      label.textContent = key;
+      item.append(img, label);
+      return item;
+    }),
+  );
 
   championSkillOrder.replaceChildren(
-    ...primarySpells.map((spell, index) => {
+    ...skillIcons.map(({ spell, key: spellKey }) => {
       const item = document.createElement("div");
       const key = document.createElement("strong");
       const name = document.createElement("span");
+      const levels = document.createElement("div");
 
       item.className = "skill-step";
-      key.textContent = ["Q", "W", "E"][index] ?? "?";
+      levels.className = "skill-levels";
+      key.textContent = spellKey;
       name.textContent = spell.name;
-      item.append(key, name);
+      levels.replaceChildren(
+        ...skillPath.map((level, levelIndex) => {
+          const cell = document.createElement("span");
+          cell.textContent = level === spellKey ? String(levelIndex + 1) : "";
+          cell.dataset.active = String(level === spellKey);
+          return cell;
+        }),
+      );
+      item.append(key, name, levels);
       return item;
     }),
   );
@@ -624,11 +696,25 @@ function renderBuild(champion: ChampionDetail): void {
   const build = extractRecommendedBuild(champion.recommended);
 
   championBuild.replaceChildren(
-    ...build.map((itemId) => {
-      const item = document.createElement("img");
-      item.alt = `Item ${itemId}`;
-      item.src = `https://ddragon.leagueoflegends.com/cdn/${champion.version}/img/item/${itemId}.png`;
-      return item;
+    ...["Starting", "Core", "Options"].map((label, sectionIndex) => {
+      const section = document.createElement("div");
+      const heading = document.createElement("span");
+      const items = document.createElement("div");
+      const slice = build.slice(sectionIndex * 2, sectionIndex * 2 + 2);
+
+      section.className = "build-section";
+      items.className = "build-items";
+      heading.textContent = label;
+      items.replaceChildren(
+        ...(slice.length > 0 ? slice : ["1001", "1056"]).map((itemId) => {
+          const item = document.createElement("img");
+          item.alt = `Item ${itemId}`;
+          item.src = `https://ddragon.leagueoflegends.com/cdn/${champion.version}/img/item/${itemId}.png`;
+          return item;
+        }),
+      );
+      section.append(heading, items);
+      return section;
     }),
   );
 
