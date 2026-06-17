@@ -15,6 +15,14 @@ const searchRegion = document.querySelector("[data-search-region]");
 const searchButton = document.querySelector("[data-search-button]");
 const championPool = document.querySelector("[data-champion-pool]");
 const championEmpty = document.querySelector("[data-champion-empty]");
+const viewTitle = document.querySelector("[data-view-title]");
+const profileToolbar = document.querySelector("[data-profile-toolbar]");
+const navItems = [...document.querySelectorAll("[data-nav-view]")];
+const viewPanels = [...document.querySelectorAll("[data-view-panel]")];
+const championSearch = document.querySelector("[data-champion-search]");
+const championRole = document.querySelector("[data-champion-role]");
+const championCatalog = document.querySelector("[data-champion-catalog]");
+let championCatalogItems = [];
 
 const savedSidebarState = localStorage.getItem("arkan.sidebar");
 
@@ -32,11 +40,20 @@ toggle.addEventListener("click", () => {
 
 brandHome.addEventListener("click", handleConnectedPlayerReset);
 searchForm.addEventListener("submit", handleManualSearch);
+championSearch.addEventListener("input", () => renderChampionCatalog(championSearch.value));
+championRole.addEventListener("change", () => renderChampionCatalog(championSearch.value));
+navItems.forEach((item) => {
+  item.addEventListener("click", (event) => {
+    event.preventDefault();
+    setActiveView(item.dataset.navView);
+  });
+});
 
 detectLeagueClient();
 
 async function handleConnectedPlayerReset(event) {
   event.preventDefault();
+  setActiveView("profile");
 
   searchInput.value = "";
   setSearchPending(false);
@@ -343,7 +360,7 @@ async function setChampionPool(masteries) {
         icon.src = champion?.iconUrl ?? "";
         icon.hidden = !champion;
         name.textContent = champion?.name ?? `Champion ${mastery.championId}`;
-        meta.textContent = `M${mastery.championLevel ?? "--"} · ${points} pts`;
+        meta.textContent = `M${mastery.championLevel ?? "--"} - ${points} pts`;
         body.append(name, meta);
         row.append(icon, body);
         return row;
@@ -377,8 +394,68 @@ async function loadChampionIndex() {
       champion.key,
       {
         name: champion.name,
+        title: champion.title,
+        tags: champion.tags,
         iconUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${champion.image.full}`,
       },
     ]),
+  );
+}
+
+async function setActiveView(viewName) {
+  navItems.forEach((item) => {
+    const isActive = item.dataset.navView === viewName;
+    item.classList.toggle("active", isActive);
+    item.toggleAttribute("aria-current", isActive);
+  });
+
+  viewPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.viewPanel !== viewName;
+  });
+
+  profileToolbar.hidden = viewName !== "profile";
+  viewTitle.textContent = viewName === "champions" ? "Champions" : "Profil joueur";
+
+  if (viewName === "champions") {
+    await loadChampionCatalog();
+  }
+}
+
+async function loadChampionCatalog() {
+  if (championCatalogItems.length > 0) {
+    renderChampionCatalog(championSearch.value);
+    return;
+  }
+
+  const championIndex = await loadChampionIndex();
+  championCatalogItems = [...championIndex.values()].sort((first, second) =>
+    first.name.localeCompare(second.name, "fr"),
+  );
+  renderChampionCatalog(championSearch.value);
+}
+
+function renderChampionCatalog(query = "") {
+  const normalizedQuery = query.trim().toLocaleLowerCase("fr");
+  const selectedRole = championRole.value;
+  const champions = championCatalogItems.filter((champion) =>
+    champion.name.toLocaleLowerCase("fr").includes(normalizedQuery) &&
+    (selectedRole === "all" || champion.tags.includes(selectedRole)),
+  );
+
+  championCatalog.replaceChildren(
+    ...champions.map((champion) => {
+      const item = document.createElement("article");
+      const icon = document.createElement("img");
+      const title = document.createElement("strong");
+      const subtitle = document.createElement("span");
+
+      item.className = "champion-tile";
+      icon.alt = "";
+      icon.src = champion.iconUrl;
+      title.textContent = champion.name;
+      subtitle.textContent = champion.title;
+      item.append(icon, title, subtitle);
+      return item;
+    }),
   );
 }
