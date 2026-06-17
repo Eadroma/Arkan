@@ -34,3 +34,14 @@ Update the ticket board after this branch is merged:
 - Commit: `e02fdd1`
 - Commit URL: `https://github.com/Eadroma/Arkan/commit/e02fdd1`
 - Notes: Added SQLite schema migration v1 for players, ranks, matches, and player_matches. Added in-memory migration tests, idempotency tests, and player upsert/read tests. App launched after the task for manual testing.
+
+## 2026-06-17 - Connected Profile UI Cleanup
+
+Update the ticket board with:
+
+- Ticket: `Nettoyer l'UI du profil connecte`
+- Status: `Done`
+- Branch: `codex/profile-ui-cleanup`
+- Commit: `f43e678`
+- Commit URL: `https://github.com/Eadroma/Arkan/commit/f43e678`
+- Notes: Removed the redundant `Client League connecte / Profil local pret a synchroniser` badge from the hero, removed the technical LCU port from the visible UI, replaced it with region, kept the player icon and detected profile display. Local tests/check/build passed, app was relaunched for manual testing, branch merged and pushed to `main`. CI on `main` passed.
