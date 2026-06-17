@@ -8,6 +8,7 @@ const lcuRegion = document.querySelector("[data-lcu-region]");
 const lcuLevel = document.querySelector("[data-lcu-level]");
 const avatarImg = document.querySelector("[data-avatar-img]");
 const avatarFallback = document.querySelector("[data-avatar-fallback]");
+const brandHome = document.querySelector("[data-brand-home]");
 const searchForm = document.querySelector("[data-search-form]");
 const searchInput = document.querySelector("[data-search-input]");
 const searchRegion = document.querySelector("[data-search-region]");
@@ -27,9 +28,28 @@ toggle.addEventListener("click", () => {
   toggle.setAttribute("aria-label", collapsed ? "Reduce sidebar" : "Expand sidebar");
 });
 
+brandHome.addEventListener("click", handleConnectedPlayerReset);
 searchForm.addEventListener("submit", handleManualSearch);
 
 detectLeagueClient();
+
+async function handleConnectedPlayerReset(event) {
+  event.preventDefault();
+
+  searchInput.value = "";
+  setSearchPending(false);
+  setLeagueClientState({
+    variant: "loading",
+    title: "Recherche automatique...",
+    kicker: "Retour profil connecte",
+    pill: "Scanning",
+    status: "Checking",
+    region: "EUW1",
+    level: "--",
+  });
+  resetProfileIcon();
+  await detectLeagueClient();
+}
 
 async function handleManualSearch(event) {
   event.preventDefault();
