@@ -67,3 +67,14 @@ Update the ticket board with:
 - Commit: `86d01c0`
 - Commit URL: `https://github.com/Eadroma/Arkan/commit/86d01c0`
 - Notes: Added a fallback from `/lol-summoner/v1/current-summoner` to `/lol-chat/v1/me` so Arkan can still display the connected Riot ID when the summoner endpoint is empty or unavailable. Added numeric/string ID handling for chat payloads and a unit test for converting chat profile data into the app's current summoner model. Local validation passed: `cargo fmt --all --check`, `cargo test -p arkan-core`, `cargo test --manifest-path src-tauri/Cargo.toml`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo build --manifest-path src-tauri/Cargo.toml`. App was relaunched for manual testing.
+
+## 2026-06-17 - Interactive Riot ID Search
+
+Update the ticket board with:
+
+- Ticket: `Rendre la recherche Riot ID interactive`
+- Status: `Done`
+- Branch: `codex/manual-riot-id-search`
+- Commit: `53aa48e`
+- Commit URL: `https://github.com/Eadroma/Arkan/commit/53aa48e`
+- Notes: The top search form now handles submit events, validates empty and malformed Riot IDs, shows loading/invalid/config states in the player hero and League Client card, and calls `resolve_riot_account` when a Riot API key is configured. Added visible badge states for loading, warning, error, and offline. Local validation passed: `cargo fmt --all --check`, `cargo test -p arkan-core`, `cargo test --manifest-path src-tauri/Cargo.toml`, `cargo check --manifest-path src-tauri/Cargo.toml`, `node --check app/app.js`, and `cargo build --manifest-path src-tauri/Cargo.toml`. App was relaunched for manual testing.
