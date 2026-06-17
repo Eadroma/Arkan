@@ -1,6 +1,8 @@
 use std::env;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
+use std::fs;
+use std::path::PathBuf;
 
 use crate::PlatformRoute;
 
@@ -17,10 +19,18 @@ pub struct AppConfig {
 
 impl AppConfig {
     pub fn from_env() -> Result<Self, ConfigError> {
+        let dot_env = read_local_dotenv();
+
         Self::from_values(
-            env::var(RIOT_API_KEY_ENV).ok(),
-            env::var(DEFAULT_PLATFORM_ENV).ok(),
-            env::var(DEFAULT_LANGUAGE_ENV).ok(),
+            env::var(RIOT_API_KEY_ENV)
+                .ok()
+                .or_else(|| dot_env_value(&dot_env, RIOT_API_KEY_ENV)),
+            env::var(DEFAULT_PLATFORM_ENV)
+                .ok()
+                .or_else(|| dot_env_value(&dot_env, DEFAULT_PLATFORM_ENV)),
+            env::var(DEFAULT_LANGUAGE_ENV)
+                .ok()
+                .or_else(|| dot_env_value(&dot_env, DEFAULT_LANGUAGE_ENV)),
         )
     }
 
@@ -97,6 +107,72 @@ fn normalize_optional_value(value: String) -> Option<String> {
     }
 }
 
+fn read_local_dotenv() -> Option<String> {
+    dotenv_candidates()
+        .into_iter()
+        .find_map(|path| fs::read_to_string(path).ok())
+}
+
+fn dotenv_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Ok(current_dir) = env::current_dir() {
+        candidates.push(current_dir.join(".env"));
+    }
+
+    if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
+        let manifest_dir = PathBuf::from(manifest_dir);
+        candidates.push(manifest_dir.join(".env"));
+
+        if let Some(parent) = manifest_dir.parent() {
+            candidates.push(parent.join(".env"));
+        }
+    }
+
+    candidates
+}
+
+fn dot_env_value(dot_env: &Option<String>, key: &str) -> Option<String> {
+    dot_env
+        .as_deref()
+        .and_then(|content| parse_dotenv_value(content, key))
+}
+
+fn parse_dotenv_value(content: &str, key: &str) -> Option<String> {
+    content.lines().find_map(|line| {
+        let trimmed = line.trim();
+
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            return None;
+        }
+
+        let (candidate_key, value) = trimmed.split_once('=')?;
+
+        if candidate_key.trim() == key {
+            Some(unquote_dotenv_value(value.trim()))
+        } else {
+            None
+        }
+    })
+}
+
+fn unquote_dotenv_value(value: &str) -> String {
+    if value.len() >= 2 {
+        let mut chars = value.chars();
+        let first = chars.next();
+        let last = value.chars().last();
+
+        if matches!(
+            (first, last),
+            (Some('"'), Some('"')) | (Some('\''), Some('\''))
+        ) {
+            return value[1..value.len() - 1].to_owned();
+        }
+    }
+
+    value.to_owned()
+}
+
 fn mask_secret(secret: &str) -> String {
     let visible_suffix: String = secret
         .chars()
@@ -148,5 +224,24 @@ mod tests {
         let error = AppConfig::from_values(None, Some("EU".to_owned()), None).unwrap_err();
 
         assert_eq!(error, ConfigError::InvalidDefaultPlatform("EU".to_owned()));
+    }
+
+    #[test]
+    fn parses_dotenv_values() {
+        let content = r#"
+            # local development
+            RIOT_API_KEY="RGAPI-local-key"
+            ARKAN_DEFAULT_PLATFORM=EUW1
+        "#;
+
+        assert_eq!(
+            parse_dotenv_value(content, RIOT_API_KEY_ENV),
+            Some("RGAPI-local-key".to_owned())
+        );
+        assert_eq!(
+            parse_dotenv_value(content, DEFAULT_PLATFORM_ENV),
+            Some("EUW1".to_owned())
+        );
+        assert_eq!(parse_dotenv_value(content, DEFAULT_LANGUAGE_ENV), None);
     }
 }
