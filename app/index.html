@@ -51,17 +51,17 @@
             <h1>Profil joueur</h1>
           </div>
 
-          <form class="searchbar">
+          <form class="searchbar" data-search-form>
             <div class="search-field">
               <span class="search-glyph" aria-hidden="true"></span>
-              <input aria-label="Riot ID" placeholder="GameName#TAG" />
+              <input aria-label="Riot ID" placeholder="GameName#TAG" data-search-input />
             </div>
-            <select aria-label="Region">
+            <select aria-label="Region" data-search-region>
               <option>EUW1</option>
               <option>NA1</option>
               <option>KR</option>
             </select>
-            <button type="submit">Search</button>
+            <button type="submit" data-search-button>Search</button>
           </form>
         </header>
 

@@ -319,6 +319,13 @@ button {
   outline: none;
 }
 
+input:disabled,
+select:disabled,
+button:disabled {
+  cursor: progress;
+  opacity: 0.66;
+}
+
 input {
   width: 100%;
   padding: 0 12px 0 34px;
@@ -491,6 +498,25 @@ button[type="submit"]:hover {
   padding: 4px 9px;
   font-size: 12px;
   font-weight: 700;
+}
+
+.status-pill[data-state="warning"],
+.status-pill[data-state="loading"] {
+  border-color: rgb(242 184 75 / 30%);
+  background: rgb(242 184 75 / 10%);
+  color: #f4ce7c;
+}
+
+.status-pill[data-state="error"] {
+  border-color: rgb(239 111 114 / 32%);
+  background: rgb(239 111 114 / 10%);
+  color: #ff9b9d;
+}
+
+.status-pill[data-state="offline"] {
+  border-color: rgb(141 152 170 / 26%);
+  background: rgb(141 152 170 / 9%);
+  color: var(--text-muted);
 }
 
 .form-row {

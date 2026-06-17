@@ -8,6 +8,10 @@ const lcuRegion = document.querySelector("[data-lcu-region]");
 const lcuLevel = document.querySelector("[data-lcu-level]");
 const avatarImg = document.querySelector("[data-avatar-img]");
 const avatarFallback = document.querySelector("[data-avatar-fallback]");
+const searchForm = document.querySelector("[data-search-form]");
+const searchInput = document.querySelector("[data-search-input]");
+const searchRegion = document.querySelector("[data-search-region]");
+const searchButton = document.querySelector("[data-search-button]");
 
 const savedSidebarState = localStorage.getItem("arkan.sidebar");
 
@@ -23,7 +27,100 @@ toggle.addEventListener("click", () => {
   toggle.setAttribute("aria-label", collapsed ? "Reduce sidebar" : "Expand sidebar");
 });
 
+searchForm.addEventListener("submit", handleManualSearch);
+
 detectLeagueClient();
+
+async function handleManualSearch(event) {
+  event.preventDefault();
+
+  const invoke = window.__TAURI__?.core?.invoke;
+  const rawRiotId = searchInput.value.trim();
+  const region = searchRegion.value;
+
+  if (!rawRiotId) {
+    setLeagueClientState({
+      variant: "warning",
+      title: "Riot ID requis",
+      kicker: "Recherche manuelle",
+      pill: "Input",
+      status: "Missing",
+      region,
+      level: "--",
+    });
+    resetProfileIcon();
+    return;
+  }
+
+  setSearchPending(true);
+  setLeagueClientState({
+    variant: "loading",
+    title: rawRiotId,
+    kicker: "Recherche Riot ID",
+    pill: "Searching",
+    status: "Lookup",
+    region,
+    level: "--",
+  });
+  resetProfileIcon();
+
+  if (!invoke) {
+    setSearchPending(false);
+    setLeagueClientState({
+      variant: "warning",
+      title: rawRiotId,
+      kicker: "Mode preview",
+      pill: "Preview",
+      status: "Local",
+      region,
+      level: "--",
+    });
+    return;
+  }
+
+  try {
+    const normalizedRiotId = await invoke("parse_riot_id", { input: rawRiotId });
+
+    try {
+      const account = await invoke("resolve_riot_account", {
+        input: normalizedRiotId,
+        platform: region,
+      });
+
+      setLeagueClientState({
+        variant: "online",
+        title: `${account.gameName}#${account.tagLine}`,
+        kicker: "Compte Riot resolu",
+        pill: "Resolved",
+        status: "Resolved",
+        region,
+        level: "--",
+      });
+    } catch (error) {
+      setLeagueClientState({
+        variant: "warning",
+        title: normalizedRiotId,
+        kicker: friendlySearchError(error),
+        pill: "Config",
+        status: "Needs key",
+        region,
+        level: "--",
+      });
+    }
+  } catch (error) {
+    setLeagueClientState({
+      variant: "error",
+      title: rawRiotId,
+      kicker: friendlySearchError(error),
+      pill: "Invalid",
+      status: "Rejected",
+      region,
+      level: "--",
+    });
+  } finally {
+    setSearchPending(false);
+  }
+}
 
 async function detectLeagueClient() {
   const invoke = window.__TAURI__?.core?.invoke;
@@ -102,13 +199,35 @@ async function detectLeagueClient() {
   }
 }
 
-function setLeagueClientState({ title, kicker, pill, status, region, level }) {
+function setLeagueClientState({ variant, title, kicker, pill, status, region, level }) {
   playerTitle.textContent = title;
   lcuKicker.textContent = kicker;
   lcuPill.textContent = pill;
+  lcuPill.dataset.state = variant ?? "offline";
   lcuStatus.textContent = status;
   lcuRegion.textContent = region;
   lcuLevel.textContent = level;
+}
+
+function setSearchPending(isPending) {
+  searchInput.disabled = isPending;
+  searchRegion.disabled = isPending;
+  searchButton.disabled = isPending;
+  searchButton.textContent = isPending ? "..." : "Search";
+}
+
+function friendlySearchError(error) {
+  const message = String(error ?? "Erreur recherche");
+
+  if (message.toLowerCase().includes("riot api key")) {
+    return "Cle Riot API manquante";
+  }
+
+  if (message.toLowerCase().includes("separator")) {
+    return "Format attendu GameName#TAG";
+  }
+
+  return message;
 }
 
 async function setProfileIcon(profileIconId) {
