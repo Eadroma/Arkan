@@ -189,6 +189,8 @@ async function detectLeagueClient() {
         level: summoner.summonerLevel ?? "--",
       });
       setProfileIcon(summoner.profileIconId);
+      setChampionPool(summoner.championMasteries);
+      hydrateConnectedProfileFromRiotId(invoke, riotId);
       return;
     }
 
@@ -202,6 +204,7 @@ async function detectLeagueClient() {
         region: "EUW1",
         level: "--",
       });
+      resetChampionPool();
       return;
     }
 
@@ -260,6 +263,31 @@ function friendlySearchError(error) {
   }
 
   return message;
+}
+
+async function hydrateConnectedProfileFromRiotId(invoke, riotId) {
+  if (!riotId.includes("#")) {
+    return;
+  }
+
+  try {
+    const account = await invoke("resolve_riot_account", {
+      input: riotId,
+      platform: "EUW1",
+    });
+
+    if (account.profileIconId) {
+      setProfileIcon(account.profileIconId);
+    }
+
+    if (account.summonerLevel) {
+      lcuLevel.textContent = account.summonerLevel;
+    }
+
+    setChampionPool(account.championMasteries);
+  } catch {
+    // The LCU profile remains useful even if Riot API enrichment fails.
+  }
 }
 
 async function setProfileIcon(profileIconId) {

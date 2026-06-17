@@ -109,6 +109,7 @@ struct CurrentSummoner {
     summoner_id: Option<u64>,
     profile_icon_id: Option<u32>,
     summoner_level: Option<u32>,
+    champion_masteries: Vec<RiotChampionMasteryResponse>,
 }
 
 impl CurrentSummoner {
@@ -223,7 +224,8 @@ async fn league_client_status() -> LeagueClientStatus {
     let summoner_result = fetch_current_summoner(&lockfile).await;
 
     match summoner_result {
-        Ok(summoner) => {
+        Ok(mut summoner) => {
+            hydrate_current_summoner_champion_pool(&mut summoner).await;
             let cache_result = persist_current_summoner(&summoner);
             let database_path = app_database_path()
                 .ok()
@@ -398,6 +400,7 @@ async fn fetch_current_summoner_endpoint(
         summoner_id: summoner.summoner_id,
         profile_icon_id: summoner.profile_icon_id,
         summoner_level: summoner.summoner_level,
+        champion_masteries: Vec::new(),
     })
 }
 
@@ -458,7 +461,67 @@ fn current_summoner_from_chat_profile(chat_profile: LcuChatMe) -> CurrentSummone
             .and_then(LcuNumericId::as_u64)
             .and_then(|icon| u32::try_from(icon).ok()),
         summoner_level: None,
+        champion_masteries: Vec::new(),
     }
+}
+
+async fn hydrate_current_summoner_champion_pool(summoner: &mut CurrentSummoner) {
+    let Ok(config) = arkan_core::AppConfig::from_env() else {
+        return;
+    };
+    let Some(api_key) = config.riot_api_key() else {
+        return;
+    };
+    let Ok(client) = arkan_core::RiotApiClient::new(api_key) else {
+        return;
+    };
+
+    if summoner.puuid.is_none() {
+        hydrate_current_summoner_account_identity(&client, summoner).await;
+    }
+
+    let Some(puuid) = summoner.puuid.as_deref() else {
+        return;
+    };
+    let Ok(masteries) = client
+        .champion_mastery_top(arkan_core::PlatformRoute::Euw1, puuid, 5)
+        .await
+    else {
+        return;
+    };
+
+    summoner.champion_masteries = masteries
+        .into_iter()
+        .map(|mastery| RiotChampionMasteryResponse {
+            champion_id: mastery.champion_id,
+            champion_level: mastery.champion_level,
+            champion_points: mastery.champion_points,
+        })
+        .collect();
+}
+
+async fn hydrate_current_summoner_account_identity(
+    client: &arkan_core::RiotApiClient,
+    summoner: &mut CurrentSummoner,
+) {
+    let riot_id_input = match (summoner.game_name.as_deref(), summoner.tag_line.as_deref()) {
+        (Some(game_name), Some(tag_line)) => format!("{game_name}#{tag_line}"),
+        _ => summoner.display_name.clone(),
+    };
+    let Ok(riot_id) = arkan_core::RiotId::parse(&riot_id_input) else {
+        return;
+    };
+
+    let Ok(account) = client
+        .account_by_riot_id(arkan_core::RegionalRoute::Europe, &riot_id)
+        .await
+    else {
+        return;
+    };
+
+    summoner.game_name = Some(account.game_name);
+    summoner.tag_line = Some(account.tag_line);
+    summoner.puuid = Some(account.puuid);
 }
 
 fn main() {
@@ -503,6 +566,7 @@ mod tests {
             summoner_id: Some(123456),
             profile_icon_id: Some(29),
             summoner_level: Some(175),
+            champion_masteries: Vec::new(),
         };
 
         persist_current_summoner_at(&path, &summoner).unwrap();
@@ -543,5 +607,6 @@ mod tests {
         assert_eq!(summoner.summoner_id, Some(123456));
         assert_eq!(summoner.profile_icon_id, Some(29));
         assert_eq!(summoner.summoner_level, None);
+        assert!(summoner.champion_masteries.is_empty());
     }
 }
