@@ -125,10 +125,11 @@ pub struct RiotAccount {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RiotSummoner {
-    pub id: String,
-    pub account_id: String,
+    pub id: Option<String>,
+    pub account_id: Option<String>,
     pub puuid: String,
     pub profile_icon_id: u32,
+    pub revision_date: Option<i64>,
     pub summoner_level: u32,
 }
 
@@ -233,12 +234,28 @@ mod tests {
         assert_eq!(
             summoner,
             RiotSummoner {
-                id: "summoner-id".to_owned(),
-                account_id: "account-id".to_owned(),
+                id: Some("summoner-id".to_owned()),
+                account_id: Some("account-id".to_owned()),
                 puuid: "abc".to_owned(),
                 profile_icon_id: 588,
+                revision_date: None,
                 summoner_level: 175,
             }
         );
+    }
+
+    #[test]
+    fn deserializes_minimal_riot_summoner_response() {
+        let json = r#"{
+            "puuid": "abc",
+            "profileIconId": 588,
+            "summonerLevel": 175
+        }"#;
+
+        let summoner = serde_json::from_str::<RiotSummoner>(json).unwrap();
+
+        assert_eq!(summoner.puuid, "abc");
+        assert_eq!(summoner.profile_icon_id, 588);
+        assert_eq!(summoner.summoner_level, 175);
     }
 }
