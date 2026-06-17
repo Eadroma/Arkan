@@ -30,6 +30,12 @@ const championDetailName = document.querySelector("[data-champion-detail-name]")
 const championDetailTitle = document.querySelector("[data-champion-detail-title]");
 const championDetailRoleSelect = document.querySelector("[data-champion-detail-role-select]");
 const championAbilities = document.querySelector("[data-champion-abilities]");
+const abilityPopover = document.querySelector("[data-ability-popover]");
+const runePrimaryHeading = document.querySelector("[data-rune-primary-heading]");
+const runePrimaryGrid = document.querySelector("[data-rune-primary-grid]");
+const runeSecondaryHeading = document.querySelector("[data-rune-secondary-heading]");
+const runeSecondaryGrid = document.querySelector("[data-rune-secondary-grid]");
+const summonerSpells = document.querySelector("[data-summoner-spells]");
 const championWinrate = document.querySelector("[data-champion-winrate]");
 const championPickrate = document.querySelector("[data-champion-pickrate]");
 const championSample = document.querySelector("[data-champion-sample]");
@@ -38,6 +44,7 @@ const championSkillOrder = document.querySelector("[data-champion-skill-order]")
 const championBuild = document.querySelector("[data-champion-build]");
 let championCatalogItems = [];
 let selectedChampion = null;
+let gameAssets = null;
 
 const savedSidebarState = localStorage.getItem("arkan.sidebar");
 
@@ -562,16 +569,25 @@ function renderChampionDetail(champion, role) {
   );
 
   renderAbilityStrip(champion);
+  renderRunes(champion);
+  renderSummonerSpells(champion);
   renderSkillOrder(champion);
   renderBuild(champion);
 }
 
 function renderAbilityStrip(champion) {
   const abilities = [
-    { key: "P", name: champion.passive?.name ?? "Passive", image: champion.passive?.image?.full, passive: true },
+    {
+      key: "P",
+      name: champion.passive?.name ?? "Passive",
+      description: champion.passive?.description ?? "",
+      image: champion.passive?.image?.full,
+      passive: true,
+    },
     ...champion.spells.map((spell, index) => ({
       key: ["Q", "W", "E", "R"][index] ?? "?",
       name: spell.name,
+      description: spell.tooltip ?? spell.description ?? "",
       image: spell.image?.full,
       passive: false,
     })),
@@ -580,20 +596,128 @@ function renderAbilityStrip(champion) {
   championAbilities.replaceChildren(
     ...abilities.map((ability) => {
       const item = document.createElement("div");
+      const button = document.createElement("button");
       const img = document.createElement("img");
       const key = document.createElement("span");
       const imagePath = ability.passive ? "passive" : "spell";
 
       item.className = "ability-chip";
+      button.type = "button";
+      button.title = ability.name;
       img.alt = ability.name;
       img.src = ability.image
         ? `https://ddragon.leagueoflegends.com/cdn/${champion.version}/img/${imagePath}/${ability.image}`
         : champion.iconUrl;
       key.textContent = ability.key;
-      item.append(img, key);
+      button.append(img, key);
+      button.addEventListener("click", () => toggleAbilityPopover(ability.name, ability.description));
+      item.append(button);
       return item;
     }),
   );
+}
+
+function toggleAbilityPopover(name, description) {
+  if (!abilityPopover.hidden && abilityPopover.dataset.abilityName === name) {
+    abilityPopover.hidden = true;
+    return;
+  }
+
+  abilityPopover.dataset.abilityName = name;
+  abilityPopover.replaceChildren();
+
+  const title = document.createElement("strong");
+  const body = document.createElement("p");
+
+  title.textContent = name;
+  body.textContent = stripHtml(description);
+  abilityPopover.append(title, body);
+  abilityPopover.hidden = false;
+}
+
+async function loadGameAssets(version) {
+  if (gameAssets) {
+    return gameAssets;
+  }
+
+  const [runeResponse, spellResponse] = await Promise.all([
+    fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/fr_FR/runesReforged.json`),
+    fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/fr_FR/summoner.json`),
+  ]);
+  const runeTrees = await runeResponse.json();
+  const spellData = await spellResponse.json();
+
+  gameAssets = {
+    runeTrees,
+    summonerSpells: spellData.data,
+  };
+
+  return gameAssets;
+}
+
+async function renderRunes(champion) {
+  try {
+    const assets = await loadGameAssets(champion.version);
+    const primary = assets.runeTrees.find((tree) => tree.name === "Domination") ?? assets.runeTrees[0];
+    const secondary = assets.runeTrees.find((tree) => tree.name === "Sorcellerie" || tree.name === "Sorcery") ?? assets.runeTrees[1];
+
+    renderRuneTree(primary, runePrimaryHeading, runePrimaryGrid, [0, 4, 8, 9], champion.version);
+    renderRuneTree(secondary, runeSecondaryHeading, runeSecondaryGrid, [1, 5, 8], champion.version);
+  } catch {
+    runePrimaryHeading.textContent = "Runes a synchroniser";
+    runePrimaryGrid.replaceChildren();
+    runeSecondaryHeading.textContent = "";
+    runeSecondaryGrid.replaceChildren();
+  }
+}
+
+function renderRuneTree(tree, heading, grid, activeIndexes, version) {
+  const icon = document.createElement("img");
+  const name = document.createElement("strong");
+  const runes = tree.slots.flatMap((slot) => slot.runes);
+
+  icon.alt = "";
+  icon.src = `https://ddragon.leagueoflegends.com/cdn/img/${tree.icon}`;
+  name.textContent = tree.name;
+  heading.replaceChildren(icon, name);
+  grid.replaceChildren(
+    ...runes.map((rune, index) => {
+      const img = document.createElement("img");
+
+      img.alt = rune.name;
+      img.title = rune.name;
+      img.dataset.active = String(activeIndexes.includes(index));
+      img.src = `https://ddragon.leagueoflegends.com/cdn/img/${rune.icon}`;
+      return img;
+    }),
+  );
+  grid.dataset.version = version;
+}
+
+async function renderSummonerSpells(champion) {
+  try {
+    const assets = await loadGameAssets(champion.version);
+    const spellIds = ["SummonerFlash", "SummonerDot"];
+
+    summonerSpells.replaceChildren(
+      ...spellIds.map((spellId) => {
+        const spell = assets.summonerSpells[spellId];
+        const item = document.createElement("button");
+        const img = document.createElement("img");
+        const label = document.createElement("span");
+
+        item.type = "button";
+        item.title = stripHtml(spell.description);
+        img.alt = spell.name;
+        img.src = `https://ddragon.leagueoflegends.com/cdn/${champion.version}/img/spell/${spell.image.full}`;
+        label.textContent = spell.name;
+        item.append(img, label);
+        return item;
+      }),
+    );
+  } catch {
+    summonerSpells.textContent = "Summoner spells indisponibles";
+  }
 }
 
 function renderSkillOrder(champion) {
@@ -645,6 +769,10 @@ function renderSkillOrder(champion) {
   if (primarySpells.length === 0) {
     championSkillOrder.textContent = "A synchroniser depuis les timelines MATCH-V5.";
   }
+}
+
+function stripHtml(value) {
+  return value.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
 }
 
 function renderBuild(champion) {

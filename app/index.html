@@ -190,6 +190,7 @@
                 </div>
                 <p data-champion-detail-title></p>
                 <div class="ability-strip" data-champion-abilities></div>
+                <div class="ability-popover" data-ability-popover hidden></div>
               </div>
             </div>
           </section>
@@ -251,22 +252,13 @@
                 <strong>Runes</strong>
               </div>
               <div class="rune-board">
-                <div class="rune-column">
-                  <span>Primary</span>
-                  <div class="rune-grid">
-                    <i data-active="true"></i><i></i><i></i>
-                    <i></i><i data-active="true"></i><i></i>
-                    <i></i><i></i><i data-active="true"></i>
-                    <i data-active="true"></i><i></i><i></i>
-                  </div>
+                <div class="rune-column" data-rune-primary>
+                  <div class="rune-tree-heading" data-rune-primary-heading></div>
+                  <div class="rune-grid" data-rune-primary-grid></div>
                 </div>
-                <div class="rune-column">
-                  <span>Secondary</span>
-                  <div class="rune-grid compact">
-                    <i></i><i data-active="true"></i><i></i>
-                    <i data-active="true"></i><i></i><i></i>
-                    <i></i><i></i><i data-active="true"></i>
-                  </div>
+                <div class="rune-column" data-rune-secondary>
+                  <div class="rune-tree-heading" data-rune-secondary-heading></div>
+                  <div class="rune-grid compact" data-rune-secondary-grid></div>
                 </div>
               </div>
             </article>
@@ -276,10 +268,7 @@
                 <h3>Summoner Spells</h3>
                 <strong>-- WR</strong>
               </div>
-              <div class="spell-pair">
-                <span>Flash</span>
-                <span>Ignite</span>
-              </div>
+              <div class="spell-pair" data-summoner-spells></div>
             </article>
 
             <article class="build-module side-promo">
