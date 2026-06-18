@@ -1028,15 +1028,17 @@ button[type="submit"]:hover {
 .build-stat-strip {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  overflow: hidden;
+  min-height: 64px;
+  overflow: visible;
 }
 
 .build-stat-strip article {
   display: grid;
   gap: 2px;
-  min-height: 52px;
+  align-content: center;
+  min-height: 64px;
   border-right: 1px solid #25295b;
-  padding: 8px 10px;
+  padding: 9px 10px;
 }
 
 .build-stat-strip article:last-child {
@@ -1053,7 +1055,8 @@ button[type="submit"]:hover {
 
 .build-stat-strip strong {
   color: #fff;
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.15;
 }
 
 .build-layout {
