@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "app.arkan.desktop",
   "build": {
-    "frontendDist": "../app",
+    "frontendDist": "../app/dist",
     "devUrl": null,
     "beforeDevCommand": "",
     "beforeBuildCommand": ""

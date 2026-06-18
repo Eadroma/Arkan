@@ -23,7 +23,7 @@ The repository currently contains a testable Rust core crate and a Tauri scaffol
 ```txt
 crates/arkan-core   Shared domain logic, parsing, routing, tests
 src-tauri           Tauri shell scaffold
-app                 Static frontend scaffold
+app                 React/Vite frontend with application, store, and UI layers
 docs                Product and technical docs
 ```
 
@@ -36,6 +36,14 @@ bun install
 bun run typecheck
 bun test
 bun run build
+```
+
+Local development can also use pnpm when Bun is unavailable:
+
+```powershell
+pnpm install
+pnpm exec tsc --noEmit
+pnpm exec vite build --configLoader runner
 ```
 
 ```powershell
@@ -74,7 +82,7 @@ The Tauri command only reports whether a key is configured and masks the value.
 - Riot platform and regional route mapping.
 - Local app configuration through environment variables.
 - Tauri command scaffold for parser/config access.
-- Static desktop UI shell for the first profile/search screen.
+- React desktop UI with a typed application layer, reducer-backed store, generic UI components, and SCSS/CSS variable styling.
 
 ## Roadmap Snapshot
 

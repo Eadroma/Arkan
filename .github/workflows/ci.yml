@@ -49,6 +49,17 @@ jobs:
         with:
           components: rustfmt
 
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Build frontend bundle for Tauri
+        run: bun run build
+
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
 
