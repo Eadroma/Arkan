@@ -618,7 +618,7 @@ function renderAbilityStrip(champion) {
       key.textContent = ability.key;
       button.append(img, key);
       button.addEventListener("click", () =>
-        showAbilityPanel(ability.key, ability.name, ability.description, {
+        toggleAbilityPanel(ability.key, ability.name, ability.description, {
           cooldown: ability.cooldown,
           cost: ability.cost,
           range: ability.range,
@@ -628,23 +628,21 @@ function renderAbilityStrip(champion) {
       return item;
     }),
   );
-
-  const firstAbility = abilities[0];
-  if (firstAbility) {
-    showAbilityPanel(firstAbility.key, firstAbility.name, firstAbility.description, {
-      cooldown: firstAbility.cooldown,
-      cost: firstAbility.cost,
-      range: firstAbility.range,
-    });
-  }
+  hideAbilityPanel();
 }
 
-function showAbilityPanel(key, name, description, meta = {}) {
+function toggleAbilityPanel(key, name, description, meta = {}) {
+  if (!abilityPopover.hidden && abilityPopover.dataset.abilityKey === key) {
+    hideAbilityPanel();
+    return;
+  }
+
   championAbilities.querySelectorAll("button").forEach((button) => {
     const isActive = button.dataset.abilityKey === key;
     button.dataset.active = String(isActive);
     button.setAttribute("aria-expanded", String(isActive));
   });
+  abilityPopover.dataset.abilityKey = key;
   abilityPopover.dataset.abilityName = name;
   abilityPopover.replaceChildren();
 
@@ -673,6 +671,17 @@ function showAbilityPanel(key, name, description, meta = {}) {
   );
   abilityPopover.append(keyPill, title, body, stats);
   abilityPopover.hidden = false;
+}
+
+function hideAbilityPanel() {
+  championAbilities.querySelectorAll("button").forEach((button) => {
+    button.dataset.active = "false";
+    button.setAttribute("aria-expanded", "false");
+  });
+  delete abilityPopover.dataset.abilityKey;
+  delete abilityPopover.dataset.abilityName;
+  abilityPopover.replaceChildren();
+  abilityPopover.hidden = true;
 }
 
 async function loadGameAssets(version) {
