@@ -2,12 +2,13 @@
   "compilerOptions": {
     "allowJs": false,
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "jsx": "react-jsx",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "noEmit": true,
+    "skipLibCheck": true,
     "strict": true,
-    "target": "ES2022",
-    "types": ["bun-types"]
+    "target": "ES2022"
   },
-  "include": ["app/src/**/*.ts"]
+  "include": ["app/src/**/*.ts", "app/src/**/*.tsx", "vite.config.ts"]
 }
