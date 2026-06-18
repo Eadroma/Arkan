@@ -955,6 +955,23 @@ button[type="submit"]:hover {
   line-height: 1.45;
 }
 
+.ability-popover-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.ability-popover-stats span {
+  border: 1px solid #303566;
+  border-radius: 999px;
+  background: #171a3c;
+  color: #c5cae6;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 760;
+}
+
 .build-tabs,
 .build-filter-bar,
 .build-stat-strip {
@@ -1011,15 +1028,17 @@ button[type="submit"]:hover {
 .build-stat-strip {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  overflow: hidden;
+  min-height: 64px;
+  overflow: visible;
 }
 
 .build-stat-strip article {
   display: grid;
   gap: 2px;
-  min-height: 52px;
+  align-content: center;
+  min-height: 64px;
   border-right: 1px solid #25295b;
-  padding: 8px 10px;
+  padding: 9px 10px;
 }
 
 .build-stat-strip article:last-child {
@@ -1036,7 +1055,8 @@ button[type="submit"]:hover {
 
 .build-stat-strip strong {
   color: #fff;
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.15;
 }
 
 .build-layout {
@@ -1055,6 +1075,10 @@ button[type="submit"]:hover {
 
 .build-module.wide {
   grid-column: 1 / -1;
+}
+
+.skill-path-module {
+  grid-column: span 2;
 }
 
 .module-header {
@@ -1238,43 +1262,61 @@ button[type="submit"]:hover {
 .skill-order {
   display: grid;
   gap: 6px;
+  overflow-x: auto;
   color: var(--text-muted);
   font-size: 12px;
+  padding-bottom: 4px;
 }
 
 .skill-step {
   display: grid;
-  grid-template-columns: 30px 118px minmax(0, 1fr);
+  grid-template-columns: 34px 150px minmax(648px, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-width: 850px;
 }
 
 .skill-step strong {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: 1px solid #343a78;
   border-radius: var(--radius-sm);
   background: #171a3c;
   color: var(--text-strong);
+  font-size: 14px;
+}
+
+.skill-step > span {
+  overflow: hidden;
+  color: #c5cae6;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-step-header {
+  color: #99a2ce;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .skill-levels {
   display: grid;
-  grid-template-columns: repeat(18, minmax(0, 1fr));
-  gap: 3px;
+  grid-template-columns: repeat(18, 32px);
+  gap: 4px;
 }
 
 .skill-levels span {
   display: grid;
   place-items: center;
-  min-width: 0;
-  height: 18px;
+  width: 32px;
+  height: 26px;
   border-radius: 3px;
   background: #1a1e40;
   color: #dce4ff;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -1363,10 +1405,10 @@ button[type="submit"]:hover {
   }
 
   .skill-step {
-    grid-template-columns: 30px minmax(0, 1fr);
+    grid-template-columns: 34px 150px minmax(648px, 1fr);
   }
 
   .skill-levels {
-    grid-column: 1 / -1;
+    grid-column: auto;
   }
 }
