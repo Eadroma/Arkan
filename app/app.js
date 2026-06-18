@@ -587,7 +587,10 @@ function renderAbilityStrip(champion) {
     ...champion.spells.map((spell, index) => ({
       key: ["Q", "W", "E", "R"][index] ?? "?",
       name: spell.name,
-      description: spell.tooltip ?? spell.description ?? "",
+      description: abilityDescription(spell),
+      cooldown: spell.cooldownBurn,
+      cost: spell.costBurn,
+      range: spell.rangeBurn,
       image: spell.image?.full,
       passive: false,
     })),
@@ -610,14 +613,20 @@ function renderAbilityStrip(champion) {
         : champion.iconUrl;
       key.textContent = ability.key;
       button.append(img, key);
-      button.addEventListener("click", () => toggleAbilityPopover(ability.name, ability.description));
+      button.addEventListener("click", () =>
+        toggleAbilityPopover(ability.name, ability.description, {
+          cooldown: ability.cooldown,
+          cost: ability.cost,
+          range: ability.range,
+        }),
+      );
       item.append(button);
       return item;
     }),
   );
 }
 
-function toggleAbilityPopover(name, description) {
+function toggleAbilityPopover(name, description, meta = {}) {
   if (!abilityPopover.hidden && abilityPopover.dataset.abilityName === name) {
     abilityPopover.hidden = true;
     return;
@@ -628,10 +637,25 @@ function toggleAbilityPopover(name, description) {
 
   const title = document.createElement("strong");
   const body = document.createElement("p");
+  const stats = document.createElement("div");
 
   title.textContent = name;
-  body.textContent = stripHtml(description);
-  abilityPopover.append(title, body);
+  body.textContent = description || "Description indisponible dans Data Dragon.";
+  stats.className = "ability-popover-stats";
+  stats.replaceChildren(
+    ...[
+      ["Cooldown", meta.cooldown],
+      ["Cost", meta.cost],
+      ["Range", meta.range],
+    ]
+      .filter(([, value]) => value && value !== "0")
+      .map(([label, value]) => {
+        const item = document.createElement("span");
+        item.textContent = `${label}: ${value}`;
+        return item;
+      }),
+  );
+  abilityPopover.append(title, body, stats);
   abilityPopover.hidden = false;
 }
 
@@ -742,7 +766,24 @@ function renderSkillOrder(champion) {
     }),
   );
 
+  const levelHeader = document.createElement("div");
+  const headerLabel = document.createElement("span");
+  const headerLevels = document.createElement("div");
+
+  levelHeader.className = "skill-step skill-step-header";
+  headerLabel.textContent = "Spell";
+  headerLevels.className = "skill-levels";
+  headerLevels.replaceChildren(
+    ...Array.from({ length: 18 }, (_, index) => {
+      const cell = document.createElement("span");
+      cell.textContent = String(index + 1);
+      return cell;
+    }),
+  );
+  levelHeader.append(document.createElement("span"), headerLabel, headerLevels);
+
   championSkillOrder.replaceChildren(
+    levelHeader,
     ...skillIcons.map(({ spell, key: spellKey }) => {
       const item = document.createElement("div");
       const key = document.createElement("strong");
@@ -772,7 +813,24 @@ function renderSkillOrder(champion) {
 }
 
 function stripHtml(value) {
-  return value.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  const parser = new DOMParser();
+  const decoded = parser.parseFromString(value, "text/html").documentElement.textContent ?? value;
+
+  return decoded
+    .replace(/<[^>]*>/g, "")
+    .replace(/\{\{.*?\}\}/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function abilityDescription(spell) {
+  const description = stripHtml(spell.description ?? "");
+
+  if (description) {
+    return description;
+  }
+
+  return stripHtml(spell.tooltip ?? "");
 }
 
 function renderBuild(champion) {
