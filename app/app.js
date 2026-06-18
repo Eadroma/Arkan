@@ -610,6 +610,7 @@ function renderAbilityStrip(champion) {
       item.className = "ability-chip";
       button.type = "button";
       button.title = ability.name;
+      button.dataset.abilityKey = ability.key;
       img.alt = ability.name;
       img.src = ability.image
         ? `https://ddragon.leagueoflegends.com/cdn/${champion.version}/img/${imagePath}/${ability.image}`
@@ -617,7 +618,7 @@ function renderAbilityStrip(champion) {
       key.textContent = ability.key;
       button.append(img, key);
       button.addEventListener("click", () =>
-        toggleAbilityPopover(ability.name, ability.description, {
+        showAbilityPanel(ability.key, ability.name, ability.description, {
           cooldown: ability.cooldown,
           cost: ability.cost,
           range: ability.range,
@@ -627,21 +628,33 @@ function renderAbilityStrip(champion) {
       return item;
     }),
   );
+
+  const firstAbility = abilities[0];
+  if (firstAbility) {
+    showAbilityPanel(firstAbility.key, firstAbility.name, firstAbility.description, {
+      cooldown: firstAbility.cooldown,
+      cost: firstAbility.cost,
+      range: firstAbility.range,
+    });
+  }
 }
 
-function toggleAbilityPopover(name, description, meta = {}) {
-  if (!abilityPopover.hidden && abilityPopover.dataset.abilityName === name) {
-    abilityPopover.hidden = true;
-    return;
-  }
-
+function showAbilityPanel(key, name, description, meta = {}) {
+  championAbilities.querySelectorAll("button").forEach((button) => {
+    const isActive = button.dataset.abilityKey === key;
+    button.dataset.active = String(isActive);
+    button.setAttribute("aria-expanded", String(isActive));
+  });
   abilityPopover.dataset.abilityName = name;
   abilityPopover.replaceChildren();
 
   const title = document.createElement("strong");
+  const keyPill = document.createElement("span");
   const body = document.createElement("p");
   const stats = document.createElement("div");
 
+  keyPill.className = "ability-key-pill";
+  keyPill.textContent = key;
   title.textContent = name;
   body.textContent = description || "Description indisponible dans Data Dragon.";
   stats.className = "ability-popover-stats";
@@ -658,7 +671,7 @@ function toggleAbilityPopover(name, description, meta = {}) {
         return item;
       }),
   );
-  abilityPopover.append(title, body, stats);
+  abilityPopover.append(keyPill, title, body, stats);
   abilityPopover.hidden = false;
 }
 
