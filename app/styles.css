@@ -788,7 +788,7 @@ button[type="submit"]:hover {
   min-height: 132px;
   border: 1px solid #27285d;
   border-radius: var(--radius-sm);
-  overflow: hidden;
+  overflow: visible;
   background:
     linear-gradient(90deg, rgb(8 9 22 / 98%) 0%, rgb(8 9 22 / 90%) 36%, rgb(8 9 22 / 44%) 100%),
     var(--champion-splash),
@@ -889,6 +889,11 @@ button[type="submit"]:hover {
   cursor: pointer;
 }
 
+.ability-chip button:focus-visible {
+  outline: 2px solid #78a2ff;
+  outline-offset: 3px;
+}
+
 .ability-chip img,
 .priority-icon img {
   width: 100%;
@@ -896,6 +901,13 @@ button[type="submit"]:hover {
   border: 1px solid #2f3370;
   border-radius: 4px;
   object-fit: cover;
+}
+
+.ability-chip button[data-active="true"] img {
+  border-color: #78a2ff;
+  box-shadow:
+    0 0 0 1px #78a2ff,
+    0 0 18px rgb(79 140 255 / 42%);
 }
 
 .ability-chip span,
@@ -915,39 +927,44 @@ button[type="submit"]:hover {
 }
 
 .ability-popover {
-  position: absolute;
-  z-index: 2;
-  left: 104px;
-  bottom: 10px;
-  width: min(440px, calc(100vw - 180px));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 8px;
+  width: min(620px, 100%);
+  margin-top: 12px;
   border: 1px solid #444a93;
   border-radius: var(--radius-sm);
-  background: #0f1028;
-  box-shadow: 0 18px 38px rgb(0 0 0 / 40%);
-  padding: 14px;
+  background: linear-gradient(180deg, #111432 0%, #0d1027 100%);
+  box-shadow: 0 14px 28px rgb(0 0 0 / 28%);
+  padding: 12px;
 }
 
 .ability-popover::before {
-  position: absolute;
-  top: -7px;
-  left: 74px;
-  width: 12px;
-  height: 12px;
-  border-top: 1px solid #444a93;
-  border-left: 1px solid #444a93;
-  background: #0f1028;
-  content: "";
-  transform: rotate(45deg);
+  display: none;
+}
+
+.ability-key-pill {
+  display: grid;
+  grid-row: span 2;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #5670ff;
+  border-radius: 5px;
+  background: #162054;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .ability-popover strong {
-  display: block;
-  margin-bottom: 10px;
   color: #4f8cff;
   font-size: 15px;
 }
 
 .ability-popover p {
+  grid-column: 2;
   margin: 0;
   color: #f5f7fb;
   font-size: 13px;
@@ -956,10 +973,11 @@ button[type="submit"]:hover {
 }
 
 .ability-popover-stats {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 12px;
+  margin-top: 2px;
 }
 
 .ability-popover-stats span {
