@@ -44,7 +44,9 @@ export type AppState = {
 
 export type MatchHistoryState = {
   entries: MatchHistoryEntry[];
-  status: "idle" | "loading" | "ready" | "error";
+  hasMore: boolean;
+  nextStart: number;
+  status: "idle" | "loading" | "loading-more" | "ready" | "error";
 };
 
 export type MatchDetailState = {
@@ -64,7 +66,8 @@ export type AppAction =
   | { pool: ChampionMastery[]; type: "championPoolChanged" }
   | { profile: PlayerProfile; type: "playerProfileChanged" }
   | { card: LeagueClientCard; type: "leagueClientChanged" }
-  | { entries: MatchHistoryEntry[]; type: "matchHistoryLoaded" }
+  | { entries: MatchHistoryEntry[]; hasMore: boolean; nextStart: number; type: "matchHistoryAppended" }
+  | { entries: MatchHistoryEntry[]; hasMore: boolean; nextStart: number; type: "matchHistoryLoaded" }
   | { status: MatchHistoryState["status"]; type: "matchHistoryStatusChanged" }
   | { detail: MatchDetail; type: "matchDetailLoaded" }
   | { matchId: string; type: "matchDetailLoadingStarted" }
@@ -107,6 +110,8 @@ const initialState: AppState = {
   leagueClient: defaultLeagueClient,
   matchHistory: {
     entries: [],
+    hasMore: true,
+    nextStart: 0,
     status: "idle",
   },
   matchDetail: {
@@ -210,6 +215,18 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         matchHistory: {
           entries: action.entries,
+          hasMore: action.hasMore,
+          nextStart: action.nextStart,
+          status: "ready",
+        },
+      };
+    case "matchHistoryAppended":
+      return {
+        ...state,
+        matchHistory: {
+          entries: [...state.matchHistory.entries, ...action.entries],
+          hasMore: action.hasMore,
+          nextStart: action.nextStart,
           status: "ready",
         },
       };
@@ -219,6 +236,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         matchHistory: {
           ...state.matchHistory,
           entries: action.status === "loading" ? [] : state.matchHistory.entries,
+          hasMore: action.status === "loading" ? true : state.matchHistory.hasMore,
+          nextStart: action.status === "loading" ? 0 : state.matchHistory.nextStart,
           status: action.status,
         },
       };

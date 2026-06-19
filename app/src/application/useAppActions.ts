@@ -10,8 +10,10 @@ export function useAppActions(): {
   detectLeagueClient: () => Promise<void>;
   loadChampionCatalog: () => Promise<void>;
   loadMatchHistoryForDisplayedPlayer: () => Promise<void>;
+  loadMoreMatchHistory: () => Promise<void>;
   openChampionDetail: (championId: string) => Promise<void>;
   openMatchDetail: (matchId: string) => Promise<void>;
+  openPlayerProfile: (riotId: string) => Promise<void>;
   resetToConnectedPlayer: () => void;
   searchRiotAccount: () => Promise<void>;
   setView: (view: ViewName) => Promise<void>;
@@ -90,19 +92,59 @@ export function useAppActions(): {
     const riotId = riotIdFromDisplayName(state.playerProfile.displayName);
 
     if (!riotId) {
-      dispatch({ entries: [], type: "matchHistoryLoaded" });
+      dispatch({ entries: [], hasMore: false, nextStart: 0, type: "matchHistoryLoaded" });
       return;
     }
 
     dispatch({ status: "loading", type: "matchHistoryStatusChanged" });
 
     try {
-      const entries = await matchHistory(riotId, state.playerProfile.region || state.search.region);
-      dispatch({ entries, type: "matchHistoryLoaded" });
+      const entries = await matchHistory(riotId, state.playerProfile.region || state.search.region, 0, matchHistoryPageSize);
+      dispatch({
+        entries,
+        hasMore: entries.length === matchHistoryPageSize,
+        nextStart: matchHistoryPageSize,
+        type: "matchHistoryLoaded",
+      });
     } catch {
       dispatch({ status: "error", type: "matchHistoryStatusChanged" });
     }
   }, [dispatch, state.playerProfile.displayName, state.playerProfile.region, state.search.region]);
+
+  const loadMoreMatchHistory = useCallback(async () => {
+    const riotId = riotIdFromDisplayName(state.playerProfile.displayName);
+
+    if (!riotId || !state.matchHistory.hasMore || state.matchHistory.status !== "ready") {
+      return;
+    }
+
+    dispatch({ status: "loading-more", type: "matchHistoryStatusChanged" });
+
+    try {
+      const entries = await matchHistory(
+        riotId,
+        state.playerProfile.region || state.search.region,
+        state.matchHistory.nextStart,
+        matchHistoryPageSize,
+      );
+      dispatch({
+        entries,
+        hasMore: entries.length === matchHistoryPageSize,
+        nextStart: state.matchHistory.nextStart + matchHistoryPageSize,
+        type: "matchHistoryAppended",
+      });
+    } catch {
+      dispatch({ status: "error", type: "matchHistoryStatusChanged" });
+    }
+  }, [
+    dispatch,
+    state.matchHistory.hasMore,
+    state.matchHistory.nextStart,
+    state.matchHistory.status,
+    state.playerProfile.displayName,
+    state.playerProfile.region,
+    state.search.region,
+  ]);
 
   const openMatchDetail = useCallback(
     async (matchId: string) => {
@@ -117,6 +159,43 @@ export function useAppActions(): {
       }
     },
     [dispatch, loadChampionCatalog, state.playerProfile.region, state.search.region],
+  );
+
+  const openPlayerProfile = useCallback(
+    async (riotId: string) => {
+      if (!riotId.includes("#")) {
+        return;
+      }
+
+      dispatch({ search: { input: riotId, isPending: true }, type: "searchChanged" });
+
+      try {
+        const [account, version] = await Promise.all([
+          resolveRiotAccount(riotId, state.playerProfile.region || state.search.region),
+          latestDataDragonVersion(),
+        ]);
+        const region = state.playerProfile.region || state.search.region;
+        dispatch({
+          profile: playerProfileFromRiotAccount(account, region, version),
+          type: "playerProfileChanged",
+        });
+        dispatch({ pool: account.championMasteries ?? [], type: "championPoolChanged" });
+        dispatch({
+          card: {
+            level: account.summonerLevel?.toString() ?? "--",
+            pill: "Resolved",
+            region,
+            status: "Resolved",
+            variant: "online",
+          },
+          type: "leagueClientChanged",
+        });
+        dispatch({ type: "viewChanged", view: "profile" });
+      } finally {
+        dispatch({ search: { isPending: false }, type: "searchChanged" });
+      }
+    },
+    [dispatch, state.playerProfile.region, state.search.region],
   );
 
   const searchRiotAccount = useCallback(async () => {
@@ -164,13 +243,17 @@ export function useAppActions(): {
     detectLeagueClient,
     loadChampionCatalog,
     loadMatchHistoryForDisplayedPlayer,
+    loadMoreMatchHistory,
     openChampionDetail,
     openMatchDetail,
+    openPlayerProfile,
     resetToConnectedPlayer,
     searchRiotAccount,
     setView,
   };
 }
+
+const matchHistoryPageSize = 10;
 
 function riotIdFromDisplayName(displayName: string): string | undefined {
   const normalized = displayName.trim();

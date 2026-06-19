@@ -180,7 +180,12 @@ async fn match_detail(match_id: &str, platform: &str) -> Result<MatchDetailRespo
 }
 
 #[tauri::command]
-async fn match_history(input: &str, platform: &str) -> Result<Vec<MatchHistoryEntry>, String> {
+async fn match_history(
+    input: &str,
+    platform: &str,
+    start: Option<u32>,
+    count: Option<u8>,
+) -> Result<Vec<MatchHistoryEntry>, String> {
     let config = arkan_core::AppConfig::from_env().map_err(|error| error.to_string())?;
     let api_key = config
         .riot_api_key()
@@ -190,12 +195,14 @@ async fn match_history(input: &str, platform: &str) -> Result<Vec<MatchHistoryEn
         .parse::<arkan_core::PlatformRoute>()
         .map_err(|error| error.to_string())?;
     let client = arkan_core::RiotApiClient::new(api_key).map_err(|error| error.to_string())?;
+    let start = start.unwrap_or(0);
+    let count = count.unwrap_or(10).clamp(1, 20);
     let account = client
         .account_by_riot_id(platform.regional_route(), &riot_id)
         .await
         .map_err(|error| error.to_string())?;
     let match_ids = client
-        .match_ids_by_puuid(platform.regional_route(), &account.puuid, 0, 5)
+        .match_ids_by_puuid(platform.regional_route(), &account.puuid, start, count)
         .await
         .map_err(|error| error.to_string())?;
     let mut entries = Vec::new();

@@ -45,14 +45,19 @@ export async function resolveRiotAccount(input: string, platform: string): Promi
   return invoke<RiotAccount>("resolve_riot_account", { input, platform });
 }
 
-export async function matchHistory(input: string, platform: string): Promise<MatchHistoryEntry[]> {
+export async function matchHistory(
+  input: string,
+  platform: string,
+  start: number,
+  count: number,
+): Promise<MatchHistoryEntry[]> {
   const invoke = tauriInvoke();
 
   if (!invoke) {
     return [];
   }
 
-  return invoke<MatchHistoryEntry[]>("match_history", { input, platform });
+  return invoke<MatchHistoryEntry[]>("match_history", { count, input, platform, start });
 }
 
 export async function matchDetail(matchId: string, platform: string): Promise<MatchDetail> {

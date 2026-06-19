@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { useAppActions } from "../../application/useAppActions";
 import type { ChampionDetail } from "../../domain/champion";
@@ -83,8 +83,9 @@ export function ProfileView(): React.JSX.Element {
 
 function MatchHistoryList(): React.JSX.Element {
   const { state } = useAppStore();
-  const { openMatchDetail } = useAppActions();
+  const { loadMoreMatchHistory, openMatchDetail } = useAppActions();
   const championIconByKey = useChampionIconByKey(state.championCatalog);
+  const listRef = useRef<HTMLDivElement>(null);
 
   if (state.matchHistory.status === "loading") {
     return <EmptyLines />;
@@ -99,7 +100,23 @@ function MatchHistoryList(): React.JSX.Element {
   }
 
   return (
-    <div className="match-history-list">
+    <div
+      className="match-history-list"
+      ref={listRef}
+      onScroll={() => {
+        const list = listRef.current;
+
+        if (!list) {
+          return;
+        }
+
+        const bottomDistance = list.scrollHeight - list.scrollTop - list.clientHeight;
+
+        if (bottomDistance < 80) {
+          void loadMoreMatchHistory();
+        }
+      }}
+    >
       {state.matchHistory.entries.map((entry) => (
         <MatchHistoryRow
           entry={entry}
@@ -110,6 +127,14 @@ function MatchHistoryList(): React.JSX.Element {
           }}
         />
       ))}
+      {state.matchHistory.status === "loading-more" ? <EmptyLines /> : null}
+      {state.matchHistory.hasMore ? (
+        <button className="match-history-load-more" type="button" onClick={() => void loadMoreMatchHistory()}>
+          Charger plus
+        </button>
+      ) : (
+        <span className="match-history-state">Fin de l'historique disponible.</span>
+      )}
     </div>
   );
 }
@@ -134,7 +159,7 @@ function MatchHistoryRow({
       </div>
       <div>
         <strong>{entry.championName}</strong>
-        <span>{formatDuration(entry.durationSeconds)}</span>
+        <span>{formatDuration(entry.durationSeconds)} - {formatMatchDate(entry.gameCreatedAt)}</span>
       </div>
       <div>
         <strong>{entry.kills}/{entry.deaths}/{entry.assists}</strong>
@@ -237,6 +262,15 @@ function formatDuration(seconds: number): string {
   const remainingSeconds = seconds % 60;
 
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+}
+
+function formatMatchDate(timestamp: number): string {
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "2-digit",
+  }).format(new Date(timestamp));
 }
 
 function queueLabel(queueId: number): string {

@@ -117,16 +117,23 @@ function ParticipantRow({
   itemVersion?: string;
   participant: MatchParticipant;
 }): React.JSX.Element {
+  const { openPlayerProfile } = useAppActions();
+
   return (
     <div className="participant-row">
-      <div className="participant-row__identity">
+      <button
+        className="participant-row__identity"
+        disabled={!participant.riotId.includes("#")}
+        type="button"
+        onClick={() => void openPlayerProfile(participant.riotId)}
+      >
         {championIconUrl ? <img src={championIconUrl} alt="" /> : <span className="participant-row__fallback">?</span>}
         <span className="participant-row__level">{participant.championLevel}</span>
         <div>
           <strong>{participant.riotId}</strong>
           <span>{participant.teamPosition}</span>
         </div>
-      </div>
+      </button>
       <strong>{carryScore(participant)}</strong>
       <div>
         <strong>{participant.kills} / {participant.deaths} / {participant.assists}</strong>
