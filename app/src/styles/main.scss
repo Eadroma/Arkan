@@ -829,6 +829,8 @@ select {
 .build-stat-strip {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: stretch;
+  min-height: 64px;
   padding: 0;
 }
 

@@ -147,6 +147,14 @@ struct LcuChatMe {
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LcuChampionMastery {
+    champion_id: u32,
+    champion_level: u32,
+    champion_points: u32,
+}
+
+#[derive(Debug, serde::Deserialize)]
 #[serde(untagged)]
 enum LcuNumericId {
     Number(u64),
@@ -225,7 +233,7 @@ async fn league_client_status() -> LeagueClientStatus {
 
     match summoner_result {
         Ok(mut summoner) => {
-            hydrate_current_summoner_champion_pool(&mut summoner).await;
+            hydrate_current_summoner_champion_pool(&lockfile, &mut summoner).await;
             let cache_result = persist_current_summoner(&summoner);
             let database_path = app_database_path()
                 .ok()
@@ -465,7 +473,17 @@ fn current_summoner_from_chat_profile(chat_profile: LcuChatMe) -> CurrentSummone
     }
 }
 
-async fn hydrate_current_summoner_champion_pool(summoner: &mut CurrentSummoner) {
+async fn hydrate_current_summoner_champion_pool(
+    lockfile: &arkan_core::LeagueClientLockfile,
+    summoner: &mut CurrentSummoner,
+) {
+    if hydrate_current_summoner_lcu_champion_pool(lockfile, summoner)
+        .await
+        .is_ok()
+    {
+        return;
+    }
+
     let Ok(config) = arkan_core::AppConfig::from_env() else {
         return;
     };
@@ -483,10 +501,8 @@ async fn hydrate_current_summoner_champion_pool(summoner: &mut CurrentSummoner) 
     let Some(puuid) = summoner.puuid.as_deref() else {
         return;
     };
-    let Ok(masteries) = client
-        .champion_mastery_top(arkan_core::PlatformRoute::Euw1, puuid, 5)
-        .await
-    else {
+    let platform = config.default_platform();
+    let Ok(masteries) = client.champion_mastery_top(platform, puuid, 5).await else {
         return;
     };
 
@@ -498,6 +514,68 @@ async fn hydrate_current_summoner_champion_pool(summoner: &mut CurrentSummoner) 
             champion_points: mastery.champion_points,
         })
         .collect();
+}
+
+async fn hydrate_current_summoner_lcu_champion_pool(
+    lockfile: &arkan_core::LeagueClientLockfile,
+    summoner: &mut CurrentSummoner,
+) -> Result<(), String> {
+    let Some(summoner_id) = summoner.summoner_id else {
+        return Err("current summoner has no summoner id".to_owned());
+    };
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .map_err(|error| format!("failed to create LCU HTTP client: {error}"))?;
+    let url = format!(
+        "{}/lol-collections/v1/inventories/{summoner_id}/champion-mastery",
+        lockfile.base_url()
+    );
+    let response = client
+        .get(url)
+        .basic_auth("riot", Some(lockfile.password()))
+        .send()
+        .await
+        .map_err(|error| format!("failed to call League Client champion mastery API: {error}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "League Client champion mastery API returned HTTP {}",
+            response.status()
+        ));
+    }
+
+    let masteries = response
+        .json::<Vec<LcuChampionMastery>>()
+        .await
+        .map_err(|error| {
+            format!("failed to parse League Client champion mastery response: {error}")
+        })?;
+
+    let champion_masteries = top_champion_masteries_from_lcu(masteries);
+
+    if champion_masteries.is_empty() {
+        return Err("League Client champion mastery API returned no masteries".to_owned());
+    }
+
+    summoner.champion_masteries = champion_masteries;
+    Ok(())
+}
+
+fn top_champion_masteries_from_lcu(
+    mut masteries: Vec<LcuChampionMastery>,
+) -> Vec<RiotChampionMasteryResponse> {
+    masteries.sort_by(|first, second| second.champion_points.cmp(&first.champion_points));
+
+    masteries
+        .into_iter()
+        .take(5)
+        .map(|mastery| RiotChampionMasteryResponse {
+            champion_id: mastery.champion_id,
+            champion_level: mastery.champion_level,
+            champion_points: mastery.champion_points,
+        })
+        .collect()
 }
 
 async fn hydrate_current_summoner_account_identity(
@@ -608,5 +686,50 @@ mod tests {
         assert_eq!(summoner.profile_icon_id, Some(29));
         assert_eq!(summoner.summoner_level, None);
         assert!(summoner.champion_masteries.is_empty());
+    }
+
+    #[test]
+    fn sorts_lcu_champion_masteries_by_points() {
+        let masteries = top_champion_masteries_from_lcu(vec![
+            LcuChampionMastery {
+                champion_id: 1,
+                champion_level: 4,
+                champion_points: 20_000,
+            },
+            LcuChampionMastery {
+                champion_id: 2,
+                champion_level: 7,
+                champion_points: 80_000,
+            },
+            LcuChampionMastery {
+                champion_id: 3,
+                champion_level: 5,
+                champion_points: 40_000,
+            },
+            LcuChampionMastery {
+                champion_id: 4,
+                champion_level: 6,
+                champion_points: 60_000,
+            },
+            LcuChampionMastery {
+                champion_id: 5,
+                champion_level: 3,
+                champion_points: 10_000,
+            },
+            LcuChampionMastery {
+                champion_id: 6,
+                champion_level: 2,
+                champion_points: 5_000,
+            },
+        ]);
+
+        assert_eq!(masteries.len(), 5);
+        assert_eq!(
+            masteries
+                .iter()
+                .map(|mastery| mastery.champion_id)
+                .collect::<Vec<_>>(),
+            vec![2, 4, 3, 1, 5]
+        );
     }
 }
