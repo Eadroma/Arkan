@@ -21,7 +21,7 @@ import { Button } from "../components/Button";
 const spellKeys = ["Q", "W", "E", "R"] as const;
 
 export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): React.JSX.Element {
-  const { dispatch, state } = useAppStore();
+  const { state } = useAppStore();
   const { setView } = useAppActions();
   const [assets, setAssets] = useState<GameAssets | null>(null);
   const role = state.selectedChampionRole;
@@ -38,26 +38,6 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
         <button type="button">Counters</button>
         <button type="button">Leaderboards</button>
       </nav>
-      <section className="build-filter-bar">
-        <select
-          aria-label="Role champion"
-          value={role}
-          onChange={(event) =>
-            dispatch({ role: event.currentTarget.value, type: "selectedChampionRoleChanged" })
-          }
-        >
-          {champion.tags.map((tag) => (
-            <option key={tag} value={tag}>{roleLabel(tag)}</option>
-          ))}
-        </select>
-        <select aria-label="Tier" defaultValue="Emerald +">
-          <option>Emerald +</option>
-        </select>
-        <select aria-label="Queue" defaultValue="Ranked Solo/Duo">
-          <option>Ranked Solo/Duo</option>
-        </select>
-        <Button tone="quiet">More...</Button>
-      </section>
       <BuildStatStrip />
       <section className="build-layout">
         <RunesModule assets={assets} champion={champion} />
