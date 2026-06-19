@@ -8,6 +8,7 @@ export type RiotAccount = {
   championMasteries?: ChampionMastery[];
   gameName: string;
   profileIconId?: number;
+  puuid?: string;
   summonerLevel?: number;
   tagLine: string;
 };
@@ -36,6 +37,19 @@ export type PlayerProfile = {
   level: string;
   region: string;
   status: string;
+};
+
+export type MatchHistoryEntry = {
+  assists: number;
+  championName: string;
+  deaths: number;
+  durationSeconds: number;
+  gameCreatedAt: number;
+  kills: number;
+  matchId: string;
+  queueId: number;
+  role: string;
+  win: boolean;
 };
 
 export type LeagueClientCard = {

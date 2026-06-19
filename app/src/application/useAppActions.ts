@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 
 import { latestDataDragonVersion, loadChampionDetail, loadChampionIndex, profileIconUrl } from "./dataDragonApi";
-import { hasTauriRuntime, leagueClientStatus, resolveRiotAccount } from "./tauriApi";
+import { hasTauriRuntime, leagueClientStatus, matchHistory, resolveRiotAccount } from "./tauriApi";
 import type { ChampionDetail } from "../domain/champion";
 import type { ChampionMastery, LeagueClientStatus, RiotAccount } from "../domain/league";
 import { useAppStore, type ViewName } from "../store/appStore";
@@ -9,6 +9,7 @@ import { useAppStore, type ViewName } from "../store/appStore";
 export function useAppActions(): {
   detectLeagueClient: () => Promise<void>;
   loadChampionCatalog: () => Promise<void>;
+  loadMatchHistoryForDisplayedPlayer: () => Promise<void>;
   openChampionDetail: (championId: string) => Promise<void>;
   resetToConnectedPlayer: () => void;
   searchRiotAccount: () => Promise<void>;
@@ -84,6 +85,24 @@ export function useAppActions(): {
     await applyLeagueClientStatus(status, dispatch, state.search.region);
   }, [dispatch, state.search.region]);
 
+  const loadMatchHistoryForDisplayedPlayer = useCallback(async () => {
+    const riotId = riotIdFromDisplayName(state.playerProfile.displayName);
+
+    if (!riotId) {
+      dispatch({ entries: [], type: "matchHistoryLoaded" });
+      return;
+    }
+
+    dispatch({ status: "loading", type: "matchHistoryStatusChanged" });
+
+    try {
+      const entries = await matchHistory(riotId, state.playerProfile.region || state.search.region);
+      dispatch({ entries, type: "matchHistoryLoaded" });
+    } catch {
+      dispatch({ status: "error", type: "matchHistoryStatusChanged" });
+    }
+  }, [dispatch, state.playerProfile.displayName, state.playerProfile.region, state.search.region]);
+
   const searchRiotAccount = useCallback(async () => {
     const input = state.search.input.trim();
 
@@ -128,11 +147,18 @@ export function useAppActions(): {
   return {
     detectLeagueClient,
     loadChampionCatalog,
+    loadMatchHistoryForDisplayedPlayer,
     openChampionDetail,
     resetToConnectedPlayer,
     searchRiotAccount,
     setView,
   };
+}
+
+function riotIdFromDisplayName(displayName: string): string | undefined {
+  const normalized = displayName.trim();
+
+  return normalized.includes("#") ? normalized : undefined;
 }
 
 async function applyLeagueClientStatus(

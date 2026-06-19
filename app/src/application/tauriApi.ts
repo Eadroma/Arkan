@@ -1,4 +1,4 @@
-import type { LeagueClientStatus, RiotAccount } from "../domain/league";
+import type { LeagueClientStatus, MatchHistoryEntry, RiotAccount } from "../domain/league";
 
 type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -42,4 +42,14 @@ export async function resolveRiotAccount(input: string, platform: string): Promi
   }
 
   return invoke<RiotAccount>("resolve_riot_account", { input, platform });
+}
+
+export async function matchHistory(input: string, platform: string): Promise<MatchHistoryEntry[]> {
+  const invoke = tauriInvoke();
+
+  if (!invoke) {
+    return [];
+  }
+
+  return invoke<MatchHistoryEntry[]>("match_history", { input, platform });
 }

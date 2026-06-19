@@ -491,6 +491,52 @@ select {
   }
 }
 
+.match-history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.match-history-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(160px, 1fr) minmax(96px, auto);
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  padding: 10px 12px;
+
+  &[data-result="win"] {
+    border-left-color: var(--success);
+  }
+
+  div {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  strong,
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 680;
+  }
+}
+
+.match-history-state {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .champion-list {
   display: grid;
   gap: 10px;

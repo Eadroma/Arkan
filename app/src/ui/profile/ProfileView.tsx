@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 
 import { useAppActions } from "../../application/useAppActions";
 import type { ChampionDetail } from "../../domain/champion";
-import type { ChampionMastery } from "../../domain/league";
+import type { ChampionMastery, MatchHistoryEntry } from "../../domain/league";
 import { useAppStore } from "../../store/appStore";
 import { EmptyLines } from "../components/EmptyLines";
 import { StatusPill } from "../components/StatusPill";
@@ -10,13 +10,17 @@ import { SurfaceCard } from "../components/SurfaceCard";
 
 export function ProfileView(): React.JSX.Element {
   const { state } = useAppStore();
-  const { loadChampionCatalog } = useAppActions();
+  const { loadChampionCatalog, loadMatchHistoryForDisplayedPlayer } = useAppActions();
 
   useEffect(() => {
     if (state.championPool.length > 0) {
       void loadChampionCatalog();
     }
   }, [loadChampionCatalog, state.championPool.length]);
+
+  useEffect(() => {
+    void loadMatchHistoryForDisplayedPlayer();
+  }, [loadMatchHistoryForDisplayedPlayer]);
 
   return (
     <section className="dashboard">
@@ -70,15 +74,53 @@ export function ProfileView(): React.JSX.Element {
           <ChampionPool />
         </SurfaceCard>
         <SurfaceCard title="Match history" aside={<span className="muted">Derniers matchs</span>} wide>
-          <div className="match-table" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
+          <MatchHistoryList />
         </SurfaceCard>
       </section>
     </section>
+  );
+}
+
+function MatchHistoryList(): React.JSX.Element {
+  const { state } = useAppStore();
+
+  if (state.matchHistory.status === "loading") {
+    return <EmptyLines />;
+  }
+
+  if (state.matchHistory.status === "error") {
+    return <span className="match-history-state">Historique indisponible pour le moment.</span>;
+  }
+
+  if (state.matchHistory.entries.length === 0) {
+    return <span className="match-history-state">Aucun match recent a afficher.</span>;
+  }
+
+  return (
+    <div className="match-history-list">
+      {state.matchHistory.entries.map((entry) => (
+        <MatchHistoryRow entry={entry} key={entry.matchId} />
+      ))}
+    </div>
+  );
+}
+
+function MatchHistoryRow({ entry }: { entry: MatchHistoryEntry }): React.JSX.Element {
+  return (
+    <article className="match-history-row" data-result={entry.win ? "win" : "loss"}>
+      <div>
+        <strong>{entry.win ? "Victoire" : "Defaite"}</strong>
+        <span>{queueLabel(entry.queueId)} - {entry.role}</span>
+      </div>
+      <div>
+        <strong>{entry.championName}</strong>
+        <span>{formatDuration(entry.durationSeconds)}</span>
+      </div>
+      <div>
+        <strong>{entry.kills}/{entry.deaths}/{entry.assists}</strong>
+        <span>KDA</span>
+      </div>
+    </article>
   );
 }
 
@@ -149,4 +191,23 @@ function useChampionRows(
 
 function formatPoints(value?: number): string {
   return value === undefined ? "--" : new Intl.NumberFormat("fr-FR").format(value);
+}
+
+function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+}
+
+function queueLabel(queueId: number): string {
+  const labels: Record<number, string> = {
+    400: "Normal Draft",
+    420: "Ranked Solo/Duo",
+    430: "Normal Blind",
+    440: "Ranked Flex",
+    450: "ARAM",
+  };
+
+  return labels[queueId] ?? `Queue ${queueId}`;
 }

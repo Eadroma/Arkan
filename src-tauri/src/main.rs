@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
+use serde_json::Value;
 
 #[tauri::command]
 fn parse_riot_id(input: &str) -> Result<String, String> {
@@ -44,6 +45,21 @@ struct RiotChampionMasteryResponse {
     champion_points: u32,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MatchHistoryEntry {
+    assists: u32,
+    champion_name: String,
+    deaths: u32,
+    duration_seconds: u64,
+    game_created_at: i64,
+    kills: u32,
+    match_id: String,
+    queue_id: u32,
+    role: String,
+    win: bool,
+}
+
 #[tauri::command]
 async fn resolve_riot_account(input: &str, platform: &str) -> Result<RiotAccountResponse, String> {
     let config = arkan_core::AppConfig::from_env().map_err(|error| error.to_string())?;
@@ -83,6 +99,41 @@ async fn resolve_riot_account(input: &str, platform: &str) -> Result<RiotAccount
         summoner_level: summoner.as_ref().map(|summoner| summoner.summoner_level),
         champion_masteries,
     })
+}
+
+#[tauri::command]
+async fn match_history(input: &str, platform: &str) -> Result<Vec<MatchHistoryEntry>, String> {
+    let config = arkan_core::AppConfig::from_env().map_err(|error| error.to_string())?;
+    let api_key = config
+        .riot_api_key()
+        .ok_or_else(|| "Riot API key is missing".to_owned())?;
+    let riot_id = arkan_core::RiotId::parse(input).map_err(|error| error.to_string())?;
+    let platform = platform
+        .parse::<arkan_core::PlatformRoute>()
+        .map_err(|error| error.to_string())?;
+    let client = arkan_core::RiotApiClient::new(api_key).map_err(|error| error.to_string())?;
+    let account = client
+        .account_by_riot_id(platform.regional_route(), &riot_id)
+        .await
+        .map_err(|error| error.to_string())?;
+    let match_ids = client
+        .match_ids_by_puuid(platform.regional_route(), &account.puuid, 0, 5)
+        .await
+        .map_err(|error| error.to_string())?;
+    let mut entries = Vec::new();
+
+    for match_id in match_ids {
+        let detail = client
+            .match_by_id(platform.regional_route(), &match_id)
+            .await
+            .map_err(|error| error.to_string())?;
+
+        if let Some(entry) = match_history_entry_from_detail(&detail, &account.puuid) {
+            entries.push(entry);
+        }
+    }
+
+    Ok(entries)
 }
 
 #[derive(Debug, Serialize)]
@@ -576,6 +627,34 @@ fn top_champion_masteries_from_lcu(
         .collect()
 }
 
+fn match_history_entry_from_detail(detail: &Value, puuid: &str) -> Option<MatchHistoryEntry> {
+    let info = detail.get("info")?;
+    let metadata = detail.get("metadata")?;
+    let participants = info.get("participants")?.as_array()?;
+    let participant = participants
+        .iter()
+        .find(|participant| participant.get("puuid").and_then(Value::as_str) == Some(puuid))?;
+    let match_id = metadata.get("matchId")?.as_str()?.to_owned();
+
+    Some(MatchHistoryEntry {
+        assists: participant.get("assists")?.as_u64()?.try_into().ok()?,
+        champion_name: participant.get("championName")?.as_str()?.to_owned(),
+        deaths: participant.get("deaths")?.as_u64()?.try_into().ok()?,
+        duration_seconds: info.get("gameDuration")?.as_u64()?,
+        game_created_at: info.get("gameCreation")?.as_i64()?,
+        kills: participant.get("kills")?.as_u64()?.try_into().ok()?,
+        match_id,
+        queue_id: info.get("queueId")?.as_u64()?.try_into().ok()?,
+        role: participant
+            .get("teamPosition")
+            .and_then(Value::as_str)
+            .filter(|role| !role.is_empty())
+            .unwrap_or("UNKNOWN")
+            .to_owned(),
+        win: participant.get("win")?.as_bool()?,
+    })
+}
+
 async fn hydrate_current_summoner_account_identity(
     client: &arkan_core::RiotApiClient,
     summoner: &mut CurrentSummoner,
@@ -607,6 +686,7 @@ fn main() {
             config_status,
             resolve_riot_account,
             local_database_status,
+            match_history,
             league_client_status
         ])
         .run(tauri::generate_context!())
@@ -729,5 +809,49 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![2, 4, 3, 1, 5]
         );
+    }
+
+    #[test]
+    fn extracts_match_history_entry_for_player() {
+        let detail = serde_json::json!({
+            "metadata": {
+                "matchId": "EUW1_123"
+            },
+            "info": {
+                "gameCreation": 1710000000000_i64,
+                "gameDuration": 1820,
+                "queueId": 420,
+                "participants": [
+                    {
+                        "puuid": "other-puuid",
+                        "championName": "Annie",
+                        "kills": 1,
+                        "deaths": 2,
+                        "assists": 3,
+                        "teamPosition": "MIDDLE",
+                        "win": false
+                    },
+                    {
+                        "puuid": "player-puuid",
+                        "championName": "Akshan",
+                        "kills": 12,
+                        "deaths": 4,
+                        "assists": 8,
+                        "teamPosition": "BOTTOM",
+                        "win": true
+                    }
+                ]
+            }
+        });
+
+        let entry = match_history_entry_from_detail(&detail, "player-puuid").unwrap();
+
+        assert_eq!(entry.match_id, "EUW1_123");
+        assert_eq!(entry.champion_name, "Akshan");
+        assert_eq!(entry.kills, 12);
+        assert_eq!(entry.deaths, 4);
+        assert_eq!(entry.assists, 8);
+        assert_eq!(entry.role, "BOTTOM");
+        assert!(entry.win);
     }
 }

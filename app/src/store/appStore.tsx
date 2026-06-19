@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useReducer, type Dispatch, type ReactNode } from "react";
 
 import type { ChampionDetail, ChampionSummary, ChampionTag } from "../domain/champion";
-import type { ChampionMastery, LeagueClientCard, PlayerProfile } from "../domain/league";
+import type { ChampionMastery, LeagueClientCard, MatchHistoryEntry, PlayerProfile } from "../domain/league";
 
 export type ViewName = "champion-detail" | "champions" | "profile";
 
@@ -31,12 +31,18 @@ export type AppState = {
   championPool: ChampionMastery[];
   connectedChampionPool: ChampionMastery[];
   leagueClient: LeagueClientCard;
+  matchHistory: MatchHistoryState;
   playerProfile: PlayerProfile;
   search: SearchState;
   selectedChampion?: ChampionDetail;
   selectedChampionRole: string;
   sidebarCollapsed: boolean;
   view: ViewName;
+};
+
+export type MatchHistoryState = {
+  entries: MatchHistoryEntry[];
+  status: "idle" | "loading" | "ready" | "error";
 };
 
 export type AppAction =
@@ -50,6 +56,8 @@ export type AppAction =
   | { pool: ChampionMastery[]; type: "championPoolChanged" }
   | { profile: PlayerProfile; type: "playerProfileChanged" }
   | { card: LeagueClientCard; type: "leagueClientChanged" }
+  | { entries: MatchHistoryEntry[]; type: "matchHistoryLoaded" }
+  | { status: MatchHistoryState["status"]; type: "matchHistoryStatusChanged" }
   | { role: string; type: "selectedChampionRoleChanged" }
   | { search: Partial<SearchState>; type: "searchChanged" }
   | { collapsed: boolean; type: "sidebarChanged" }
@@ -86,6 +94,10 @@ const initialState: AppState = {
   championPool: [],
   connectedChampionPool: [],
   leagueClient: defaultLeagueClient,
+  matchHistory: {
+    entries: [],
+    status: "idle",
+  },
   playerProfile: defaultPlayerProfile,
   search: {
     input: "",
@@ -178,6 +190,23 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         leagueClient: action.card,
+      };
+    case "matchHistoryLoaded":
+      return {
+        ...state,
+        matchHistory: {
+          entries: action.entries,
+          status: "ready",
+        },
+      };
+    case "matchHistoryStatusChanged":
+      return {
+        ...state,
+        matchHistory: {
+          ...state.matchHistory,
+          entries: action.status === "loading" ? [] : state.matchHistory.entries,
+          status: action.status,
+        },
       };
     case "playerProfileChanged":
       return {
