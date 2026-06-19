@@ -10,7 +10,9 @@ import { SurfaceCard } from "../components/SurfaceCard";
 
 export function ProfileView(): React.JSX.Element {
   const { state } = useAppStore();
-  const { loadChampionCatalog, loadMatchHistoryForDisplayedPlayer } = useAppActions();
+  const { loadChampionCatalog, loadMatchHistoryForDisplayedPlayer, resetToConnectedPlayer } = useAppActions();
+  const isViewingConnectedPlayer =
+    state.playerProfile.displayName === state.connectedPlayerProfile.displayName;
 
   useEffect(() => {
     if (state.championPool.length > 0) {
@@ -33,6 +35,11 @@ export function ProfileView(): React.JSX.Element {
           <div>
             <p className="panel-kicker">{state.playerProfile.kicker}</p>
             <h2>{state.playerProfile.displayName}</h2>
+            {!isViewingConnectedPlayer ? (
+              <button className="profile-return-button" type="button" onClick={resetToConnectedPlayer}>
+                Revenir a mon profil
+              </button>
+            ) : null}
           </div>
         </div>
         <div className="hero-stats" aria-label="Player summary placeholders">

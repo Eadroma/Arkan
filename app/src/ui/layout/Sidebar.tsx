@@ -17,7 +17,9 @@ export function Sidebar(): React.JSX.Element {
     <aside className="sidebar">
       <div className="sidebar-header">
         <button className="brand" type="button" aria-label="Retour au joueur connecte" onClick={resetToConnectedPlayer}>
-          <span className="brand-mark">A</span>
+          <span className="brand-mark">
+            <img src="/arkane-icon.svg" alt="" />
+          </span>
           <span className="brand-name">Arkan</span>
         </button>
         <button
