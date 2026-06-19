@@ -602,17 +602,18 @@ select {
 
 .champion-build-page {
   gap: 10px;
-  height: calc(100vh - var(--topbar-height));
+  min-height: calc(100vh - var(--topbar-height));
   overflow-y: auto;
   padding: 14px;
   background: #090b12;
 }
 
 .build-hero {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: end;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
   min-height: 132px;
+  overflow: hidden;
   background:
     linear-gradient(90deg, rgb(8 9 22 / 98%) 0%, rgb(8 9 22 / 90%) 36%, rgb(8 9 22 / 44%) 100%),
     var(--champion-splash),
@@ -622,11 +623,16 @@ select {
   padding: 14px;
 }
 
+.build-back-button {
+  flex: 0 0 auto;
+}
+
 .build-hero-main {
   display: grid;
   grid-template-columns: 76px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .build-portrait {
@@ -641,10 +647,21 @@ select {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 
   h2 {
     margin: 0;
     font-size: 22px;
+    line-height: 1.1;
+  }
+}
+
+.build-title-block {
+  min-width: 0;
+
+  p {
+    margin: 8px 0 0;
+    color: var(--text-main);
   }
 }
 
@@ -801,14 +818,56 @@ select {
 
 .build-layout {
   display: grid;
-  grid-template-columns: 1.2fr 0.9fr 0.8fr;
+  grid-template-areas:
+    "runes runes spells source"
+    "matchups matchups matchups matchups"
+    "priority skills skills skills"
+    "items items items items";
+  grid-template-columns: minmax(260px, 0.9fr) minmax(260px, 1fr) minmax(250px, 0.9fr) minmax(220px, 0.8fr);
   gap: 10px;
 }
 
 .build-module {
   display: grid;
+  align-content: start;
   gap: 12px;
+  min-width: 0;
   padding: 12px;
+}
+
+.runes-module {
+  grid-area: runes;
+}
+
+.spells-module {
+  grid-area: spells;
+}
+
+.data-source-module {
+  grid-area: source;
+
+  p {
+    margin: 0;
+    color: var(--text-main);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+}
+
+.matchups-module {
+  grid-area: matchups;
+}
+
+.skill-priority-module {
+  grid-area: priority;
+}
+
+.skill-path-module {
+  grid-area: skills;
+}
+
+.items-module {
+  grid-area: items;
 }
 
 .rune-board {
@@ -833,12 +892,12 @@ select {
 
 .rune-grid {
   display: grid;
-  grid-template-columns: repeat(4, 36px);
-  gap: 12px;
+  grid-template-columns: repeat(4, minmax(28px, 36px));
+  gap: 10px;
   margin-top: 12px;
 
   &.compact {
-    grid-template-columns: repeat(3, 36px);
+    grid-template-columns: repeat(3, minmax(28px, 36px));
   }
 
   img {
@@ -864,9 +923,12 @@ select {
 }
 
 .spell-card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 6px;
-  width: 66px;
+  width: 68px;
+  min-height: 76px;
   border: 1px solid #2d336b;
   border-radius: var(--radius-sm);
   background: #121638;
@@ -878,8 +940,10 @@ select {
   }
 
   span {
+    width: 100%;
     overflow: hidden;
     font-size: 11px;
+    text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -895,26 +959,49 @@ select {
   padding: 8px;
 }
 
-.skill-path-module {
-  grid-column: span 2;
-}
-
 .skill-order {
   overflow-x: auto;
+  padding-bottom: 4px;
 }
 
 .skill-step {
   display: grid;
-  grid-template-columns: 34px 150px minmax(648px, 1fr);
+  grid-template-columns: 34px minmax(140px, 190px) minmax(720px, 1fr);
   gap: 8px;
   align-items: center;
-  min-width: 850px;
+  min-width: 960px;
   margin-bottom: 6px;
+
+  > strong {
+    display: grid;
+    place-items: center;
+    min-height: 28px;
+    border: 1px solid #3c4f95;
+    border-radius: 5px;
+    background: #121638;
+  }
+
+  > span {
+    overflow: hidden;
+    color: var(--text-main);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.skill-step-header {
+  color: var(--text-muted);
+  font-size: 11px;
+
+  > strong {
+    border: 0;
+    background: transparent;
+  }
 }
 
 .skill-levels {
   display: grid;
-  grid-template-columns: repeat(18, 32px);
+  grid-template-columns: repeat(18, 36px);
   gap: 4px;
 
   span {
@@ -940,6 +1027,11 @@ select {
   border-radius: 4px;
 }
 
+.build-list span {
+  color: var(--text-main);
+  font-size: 13px;
+}
+
 .module-footnote {
   color: var(--text-muted);
   font-size: 11px;
@@ -949,8 +1041,19 @@ select {
   .topbar,
   .section-head,
   .hero-panel,
-  .build-layout,
   .rune-board {
+    grid-template-columns: 1fr;
+  }
+
+  .build-layout {
+    grid-template-areas:
+      "runes"
+      "spells"
+      "source"
+      "matchups"
+      "priority"
+      "skills"
+      "items";
     grid-template-columns: 1fr;
   }
 

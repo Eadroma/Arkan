@@ -62,10 +62,7 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
       <section className="build-layout">
         <RunesModule assets={assets} champion={champion} />
         <SummonerSpellsModule assets={assets} champion={champion} />
-        <article className="build-module side-promo">
-          <strong>Personal Stats</strong>
-          <span>Brancher les agregats MATCH-V5 debloquera les stats de build reelles.</span>
-        </article>
+        <DataSourceModule />
         <MatchupsModule />
         <SkillPriority champion={champion} />
         <SkillPath champion={champion} />
@@ -89,7 +86,7 @@ function ChampionHero({
       className="build-hero"
       style={{ "--champion-splash": `url("https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion.id}_0.jpg")` } as CSSProperties}
     >
-      <Button className="text-button" tone="quiet" onClick={onBack}>Retour</Button>
+      <Button className="build-back-button" tone="quiet" onClick={onBack}>Retour</Button>
       <div className="build-hero-main">
         <img className="build-portrait" src={champion.iconUrl} alt="" />
         <div className="build-title-block">
@@ -277,9 +274,23 @@ function SummonerSpellsModule({ assets, champion }: { assets: GameAssets | null;
   );
 }
 
+function DataSourceModule(): React.JSX.Element {
+  return (
+    <article className="build-module data-source-module">
+      <div className="module-header">
+        <h3>Stats source</h3>
+        <strong>MATCH-V5</strong>
+      </div>
+      <p>
+        Les builds publics seront branches depuis des aggregats de matchs par champion, role, rang et patch.
+      </p>
+    </article>
+  );
+}
+
 function MatchupsModule(): React.JSX.Element {
   return (
-    <article className="build-module wide matchups-module">
+    <article className="build-module matchups-module">
       <div className="module-header">
         <h3>Toughest Matchups</h3>
         <span>Ces champions counter le pick</span>
@@ -301,7 +312,7 @@ function SkillPriority({ champion }: { champion: ChampionDetail }): React.JSX.El
   const primarySpells = champion.spells.slice(0, 3);
 
   return (
-    <article className="build-module skill-priority">
+    <article className="build-module skill-priority-module">
       <div className="module-header">
         <h3>Skill Priority</h3>
         <strong>-- WR</strong>
@@ -374,7 +385,7 @@ function BestBuild({ champion }: { champion: ChampionDetail }): React.JSX.Elemen
   const items = extractRecommendedBuild(champion.recommended);
 
   return (
-    <article className="build-module wide items-module">
+    <article className="build-module items-module">
       <div className="module-header">
         <h3>Best Build</h3>
         <span>Items by phase</span>

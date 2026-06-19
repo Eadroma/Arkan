@@ -27,6 +27,7 @@ export type AppState = {
   championCatalog: ChampionDetail[];
   championCatalogFilters: ChampionCatalogFilters;
   championCatalogStatus: "idle" | "loading" | "ready" | "error";
+  connectedPlayerProfile: PlayerProfile;
   championPool: ChampionMastery[];
   connectedChampionPool: ChampionMastery[];
   leagueClient: LeagueClientCard;
@@ -45,6 +46,7 @@ export type AppAction =
   | { champions: ChampionDetail[]; type: "championCatalogLoaded" }
   | { status: AppState["championCatalogStatus"]; type: "championCatalogStatusChanged" }
   | { filters: Partial<ChampionCatalogFilters>; type: "championFiltersChanged" }
+  | { pool: ChampionMastery[]; profile: PlayerProfile; type: "connectedPlayerChanged" }
   | { pool: ChampionMastery[]; type: "championPoolChanged" }
   | { profile: PlayerProfile; type: "playerProfileChanged" }
   | { card: LeagueClientCard; type: "leagueClientChanged" }
@@ -80,6 +82,7 @@ const initialState: AppState = {
     role: "all",
   },
   championCatalogStatus: "idle",
+  connectedPlayerProfile: defaultPlayerProfile,
   championPool: [],
   connectedChampionPool: [],
   leagueClient: defaultLeagueClient,
@@ -158,11 +161,18 @@ function appReducer(state: AppState, action: AppAction): AppState {
           ...action.filters,
         },
       };
+    case "connectedPlayerChanged":
+      return {
+        ...state,
+        championPool: action.pool,
+        connectedChampionPool: action.pool,
+        connectedPlayerProfile: action.profile,
+        playerProfile: action.profile,
+      };
     case "championPoolChanged":
       return {
         ...state,
         championPool: action.pool,
-        connectedChampionPool: state.connectedChampionPool.length > 0 ? state.connectedChampionPool : action.pool,
       };
     case "leagueClientChanged":
       return {
@@ -172,7 +182,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case "playerProfileChanged":
       return {
         ...state,
-        connectedChampionPool: action.profile.championMasteries,
         playerProfile: action.profile,
       };
     case "searchChanged":
