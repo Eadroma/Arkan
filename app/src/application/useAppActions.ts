@@ -169,15 +169,12 @@ async function applyLeagueClientStatus(
   }
 
   const summoner = status.summoner;
-  const version = await latestDataDragonVersion();
   const displayName = summoner.gameName && summoner.tagLine
     ? `${summoner.gameName}#${summoner.tagLine}`
     : summoner.displayName;
   const profile = {
     championMasteries: summoner.championMasteries ?? [],
     displayName,
-    iconUrl:
-      summoner.profileIconId === undefined ? undefined : profileIconUrl(version, summoner.profileIconId),
     kicker: "Joueur connecte detecte",
     level: summoner.summonerLevel?.toString() ?? "--",
     region,
@@ -199,6 +196,24 @@ async function applyLeagueClientStatus(
     },
     type: "leagueClientChanged",
   });
+
+  if (summoner.profileIconId === undefined) {
+    return;
+  }
+
+  try {
+    const version = await latestDataDragonVersion();
+    dispatch({
+      pool: summoner.championMasteries ?? [],
+      profile: {
+        ...profile,
+        iconUrl: profileIconUrl(version, summoner.profileIconId),
+      },
+      type: "connectedPlayerChanged",
+    });
+  } catch {
+    // Keep the detected player and champion pool even if Data Dragon is temporarily unavailable.
+  }
 }
 
 function playerProfileFromRiotAccount(
