@@ -673,6 +673,7 @@ select {
 
 .build-title-block {
   min-width: 0;
+  padding-bottom: 2px;
 
   p {
     margin: 8px 0 0;
@@ -752,7 +753,6 @@ select {
   column-gap: 10px;
   row-gap: 8px;
   width: min(620px, 100%);
-  margin-top: 12px;
   border: 1px solid #444a93;
   border-radius: var(--radius-sm);
   background: linear-gradient(180deg, #111432 0%, #0d1027 100%);
