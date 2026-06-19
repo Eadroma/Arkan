@@ -1,0 +1,78 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="42%" r="65%">
+      <stop offset="0%" stop-color="#163B68"/>
+      <stop offset="45%" stop-color="#081522"/>
+      <stop offset="100%" stop-color="#02060B"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="250" y1="125" x2="760" y2="890" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFF0B8"/>
+      <stop offset="22%" stop-color="#D8A94A"/>
+      <stop offset="55%" stop-color="#8B5B20"/>
+      <stop offset="78%" stop-color="#E3B860"/>
+      <stop offset="100%" stop-color="#FFF3C4"/>
+    </linearGradient>
+    <linearGradient id="goldDark" x1="210" y1="160" x2="820" y2="860" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4D2E11"/>
+      <stop offset="100%" stop-color="#B9852E"/>
+    </linearGradient>
+    <linearGradient id="crystal" x1="512" y1="420" x2="512" y2="815" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E9FFFF"/>
+      <stop offset="22%" stop-color="#39C8FF"/>
+      <stop offset="58%" stop-color="#146DFF"/>
+      <stop offset="100%" stop-color="#071B7A"/>
+    </linearGradient>
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="22" stdDeviation="22" flood-color="#000000" flood-opacity="0.65"/>
+    </filter>
+  </defs>
+
+  <rect x="48" y="48" width="928" height="928" rx="210" fill="url(#bgGlow)"/>
+  <rect x="58" y="58" width="908" height="908" rx="200" stroke="#C99642" stroke-width="10" opacity="0.75"/>
+  <rect x="88" y="88" width="848" height="848" rx="172" stroke="#4B351A" stroke-width="6" opacity="0.8"/>
+
+  <circle cx="512" cy="512" r="360" stroke="#C99642" stroke-width="8" opacity="0.55"/>
+  <circle cx="512" cy="512" r="300" stroke="#38577E" stroke-width="4" opacity="0.45"/>
+  <path d="M198 515C290 404 392 348 511 348C631 348 735 405 826 516" stroke="#7F5A28" stroke-width="5" opacity="0.55"/>
+  <path d="M220 632C300 700 398 737 512 737C627 737 724 700 804 632" stroke="#7F5A28" stroke-width="5" opacity="0.45"/>
+
+  <path d="M181 605C291 525 354 571 448 485C541 401 626 438 741 340" stroke="#315BFF" stroke-width="8" stroke-linecap="round" opacity="0.55" filter="url(#softGlow)"/>
+  <path d="M223 377C350 443 418 382 529 484C621 569 696 521 816 636" stroke="#8D35FF" stroke-width="6" stroke-linecap="round" opacity="0.4" filter="url(#softGlow)"/>
+
+  <g filter="url(#shadow)">
+    <path d="M512 135L830 838H708L641 682H383L316 838H194L512 135ZM424 584H600L512 371L424 584Z" fill="url(#goldDark)"/>
+    <path d="M512 109L854 858H706L640 700H384L318 858H170L512 109ZM424 598H600L512 386L424 598Z" fill="url(#gold)"/>
+    <path d="M512 189L763 806H721L652 643H372L303 806H261L512 189ZM398 602H626L512 318L398 602Z" fill="#120D08" opacity="0.72"/>
+    <path d="M512 109L854 858H706L640 700H384L318 858H170L512 109ZM424 598H600L512 386L424 598Z" stroke="#FFF1B6" stroke-width="7" opacity="0.75"/>
+    <path d="M512 109L854 858H706L640 700H384L318 858H170L512 109ZM424 598H600L512 386L424 598Z" stroke="#5B3512" stroke-width="17" opacity="0.35"/>
+  </g>
+
+  <g filter="url(#softGlow)">
+    <path d="M512 438L576 553L512 835L448 553L512 438Z" fill="url(#crystal)"/>
+    <path d="M512 438L576 553L512 835L448 553L512 438Z" stroke="#C9FFFF" stroke-width="6"/>
+    <path d="M512 438V835" stroke="#DDFDFF" stroke-width="4" opacity="0.75"/>
+    <path d="M448 553H576" stroke="#AEEFFF" stroke-width="4" opacity="0.75"/>
+    <path d="M512 438L536 553L512 835L488 553L512 438Z" fill="#FFFFFF" opacity="0.17"/>
+  </g>
+
+  <g fill="#D8A94A" stroke="#FFF0B8" stroke-width="3" opacity="0.9">
+    <path d="M512 72L536 112L512 152L488 112L512 72Z"/>
+    <path d="M512 872L536 912L512 952L488 912L512 872Z"/>
+    <path d="M72 512L112 488L152 512L112 536L72 512Z"/>
+    <path d="M872 512L912 488L952 512L912 536L872 512Z"/>
+  </g>
+
+  <g opacity="0.38" stroke="#B9852E" stroke-width="10" stroke-linecap="round">
+    <path d="M735 245H824"/>
+    <path d="M768 278H858"/>
+    <path d="M202 766H302"/>
+    <path d="M166 728H260"/>
+  </g>
+</svg>

@@ -1,8 +1,8 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { useAppActions } from "../../application/useAppActions";
 import type { ChampionDetail } from "../../domain/champion";
-import type { ChampionMastery } from "../../domain/league";
+import type { ChampionMastery, MatchHistoryEntry } from "../../domain/league";
 import { useAppStore } from "../../store/appStore";
 import { EmptyLines } from "../components/EmptyLines";
 import { StatusPill } from "../components/StatusPill";
@@ -10,13 +10,19 @@ import { SurfaceCard } from "../components/SurfaceCard";
 
 export function ProfileView(): React.JSX.Element {
   const { state } = useAppStore();
-  const { loadChampionCatalog } = useAppActions();
+  const { loadChampionCatalog, loadMatchHistoryForDisplayedPlayer, resetToConnectedPlayer } = useAppActions();
+  const isViewingConnectedPlayer =
+    state.playerProfile.displayName === state.connectedPlayerProfile.displayName;
 
   useEffect(() => {
     if (state.championPool.length > 0) {
       void loadChampionCatalog();
     }
   }, [loadChampionCatalog, state.championPool.length]);
+
+  useEffect(() => {
+    void loadMatchHistoryForDisplayedPlayer();
+  }, [loadMatchHistoryForDisplayedPlayer]);
 
   return (
     <section className="dashboard">
@@ -29,6 +35,11 @@ export function ProfileView(): React.JSX.Element {
           <div>
             <p className="panel-kicker">{state.playerProfile.kicker}</p>
             <h2>{state.playerProfile.displayName}</h2>
+            {!isViewingConnectedPlayer ? (
+              <button className="profile-return-button" type="button" onClick={resetToConnectedPlayer}>
+                Revenir a mon profil
+              </button>
+            ) : null}
           </div>
         </div>
         <div className="hero-stats" aria-label="Player summary placeholders">
@@ -70,15 +81,102 @@ export function ProfileView(): React.JSX.Element {
           <ChampionPool />
         </SurfaceCard>
         <SurfaceCard title="Match history" aside={<span className="muted">Derniers matchs</span>} wide>
-          <div className="match-table" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
+          <MatchHistoryList />
         </SurfaceCard>
       </section>
     </section>
+  );
+}
+
+function MatchHistoryList(): React.JSX.Element {
+  const { state } = useAppStore();
+  const { loadMoreMatchHistory, openMatchDetail } = useAppActions();
+  const championIconByKey = useChampionIconByKey(state.championCatalog);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  if (state.matchHistory.status === "loading") {
+    return <EmptyLines />;
+  }
+
+  if (state.matchHistory.status === "error") {
+    return <span className="match-history-state">Historique indisponible pour le moment.</span>;
+  }
+
+  if (state.matchHistory.entries.length === 0) {
+    return <span className="match-history-state">Aucun match recent a afficher.</span>;
+  }
+
+  return (
+    <div
+      className="match-history-list"
+      ref={listRef}
+      onScroll={() => {
+        const list = listRef.current;
+
+        if (!list) {
+          return;
+        }
+
+        const bottomDistance = list.scrollHeight - list.scrollTop - list.clientHeight;
+
+        if (bottomDistance < 80) {
+          void loadMoreMatchHistory();
+        }
+      }}
+    >
+      {state.matchHistory.entries.map((entry) => (
+        <MatchHistoryRow
+          entry={entry}
+          iconUrl={championIconByKey.get(entry.championId.toString())}
+          key={entry.matchId}
+          onOpen={() => {
+            void openMatchDetail(entry.matchId);
+          }}
+        />
+      ))}
+      {state.matchHistory.status === "loading-more" ? <EmptyLines /> : null}
+      {state.matchHistory.hasMore ? (
+        <button className="match-history-load-more" type="button" onClick={() => void loadMoreMatchHistory()}>
+          Charger plus
+        </button>
+      ) : (
+        <span className="match-history-state">Fin de l'historique disponible.</span>
+      )}
+    </div>
+  );
+}
+
+function MatchHistoryRow({
+  entry,
+  iconUrl,
+  onOpen,
+}: {
+  entry: MatchHistoryEntry;
+  iconUrl?: string;
+  onOpen: () => void;
+}): React.JSX.Element {
+  return (
+    <button className="match-history-row" data-result={entry.win ? "win" : "loss"} type="button" onClick={onOpen}>
+      <div className="match-history-row__result">
+        {iconUrl ? <img src={iconUrl} alt="" /> : <span className="match-history-row__fallback">?</span>}
+        <div>
+          <strong>{entry.win ? "Victoire" : "Defaite"}</strong>
+          <span>{queueLabel(entry.queueId)} - {entry.role}</span>
+        </div>
+      </div>
+      <div>
+        <strong>{entry.championName}</strong>
+        <span>{formatDuration(entry.durationSeconds)} - {formatMatchDate(entry.gameCreatedAt)}</span>
+      </div>
+      <div>
+        <strong>{entry.kills}/{entry.deaths}/{entry.assists}</strong>
+        <span>KDA</span>
+      </div>
+      <div className="match-history-row__lp">
+        <strong>{formatLpDelta(entry.lpDelta)}</strong>
+        <span>LP</span>
+      </div>
+    </button>
   );
 }
 
@@ -147,6 +245,49 @@ function useChampionRows(
   );
 }
 
+function useChampionIconByKey(catalog: ChampionDetail[]): Map<string, string> {
+  return useMemo(
+    () => new Map(catalog.map((champion) => [champion.key, champion.iconUrl])),
+    [catalog],
+  );
+}
+
 function formatPoints(value?: number): string {
   return value === undefined ? "--" : new Intl.NumberFormat("fr-FR").format(value);
+}
+
+function formatLpDelta(value: number | null): string {
+  if (value === null) {
+    return "--";
+  }
+
+  return value > 0 ? `+${value}` : value.toString();
+}
+
+function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+}
+
+function formatMatchDate(timestamp: number): string {
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "2-digit",
+  }).format(new Date(timestamp));
+}
+
+function queueLabel(queueId: number): string {
+  const labels: Record<number, string> = {
+    400: "Normal Draft",
+    420: "Ranked Solo/Duo",
+    430: "Normal Blind",
+    440: "Ranked Flex",
+    450: "ARAM",
+  };
+
+  return labels[queueId] ?? `Queue ${queueId}`;
 }

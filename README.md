@@ -1,5 +1,9 @@
 # Arkan
 
+<p align="center">
+  <img src="app/public/arkane-icon.svg" alt="Arkan icon" width="128" height="128" />
+</p>
+
 [![CI](https://github.com/Eadroma/Arkan/actions/workflows/ci.yml/badge.svg)](https://github.com/Eadroma/Arkan/actions/workflows/ci.yml)
 
 Arkan is a Rust-first desktop companion for League of Legends: a local-first player profile, match history, and progression analysis app inspired by tools like OP.GG and Blitz, built with a careful Riot API integration.
@@ -15,6 +19,10 @@ The project starts with a focused MVP before expanding into live-client or overl
 ## Repository Description
 
 Rust/Tauri League of Legends companion app for Riot ID lookup, local match-history cache, champion statistics, and progression insights.
+
+## Visual Identity
+
+Arkan uses an arcane gold-and-crystal identity: deep navy surfaces, antique gold accents, and blue crystal highlights. The application icon is the source asset for the in-app brand mark and desktop bundle icon.
 
 ## Current Status
 

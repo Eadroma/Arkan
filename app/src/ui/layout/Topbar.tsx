@@ -6,7 +6,13 @@ export function Topbar(): React.JSX.Element {
   const { dispatch, state } = useAppStore();
   const { searchRiotAccount } = useAppActions();
   const isProfileView = state.view === "profile";
-  const title = state.view === "profile" ? "Profil joueur" : "Champions";
+  const titleByView = {
+    "champion-detail": "Champion",
+    champions: "Champions",
+    "match-detail": "Match detail",
+    profile: "Profil joueur",
+  };
+  const title = titleByView[state.view];
 
   return (
     <header className="topbar">
