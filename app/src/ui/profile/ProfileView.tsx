@@ -1,9 +1,9 @@
 import { useEffect, useMemo } from "react";
 
 import { useAppActions } from "../../application/useAppActions";
-import { useAppStore } from "../../store/appStore";
 import type { ChampionDetail } from "../../domain/champion";
 import type { ChampionMastery } from "../../domain/league";
+import { useAppStore } from "../../store/appStore";
 import { EmptyLines } from "../components/EmptyLines";
 import { StatusPill } from "../components/StatusPill";
 import { SurfaceCard } from "../components/SurfaceCard";
@@ -47,7 +47,10 @@ export function ProfileView(): React.JSX.Element {
         </div>
       </section>
       <section className="cards-grid">
-        <SurfaceCard title="League Client" aside={<StatusPill variant={state.leagueClient.variant}>{state.leagueClient.pill}</StatusPill>}>
+        <SurfaceCard
+          title="League Client"
+          aside={<StatusPill variant={state.leagueClient.variant}>{state.leagueClient.pill}</StatusPill>}
+        >
           <div className="client-details">
             <div>
               <span>Status</span>
@@ -64,7 +67,7 @@ export function ProfileView(): React.JSX.Element {
           </div>
         </SurfaceCard>
         <SurfaceCard title="Champion pool" aside={<span className="muted">Top 5</span>}>
-          <ChampionPool masteries={state.championPool} />
+          <ChampionPool />
         </SurfaceCard>
         <SurfaceCard title="Match history" aside={<span className="muted">Derniers matchs</span>} wide>
           <div className="match-table" aria-hidden="true">
@@ -79,22 +82,26 @@ export function ProfileView(): React.JSX.Element {
   );
 }
 
-function ChampionPool({ masteries }: { masteries: ChampionMastery[] }): React.JSX.Element {
+function ChampionPool(): React.JSX.Element {
   const { openChampionDetail } = useAppActions();
   const { state } = useAppStore();
-  const championRows = useChampionRows(masteries, state.championCatalog);
+  const championRows = useChampionRows(state.championPool, state.championCatalog);
 
-  if (masteries.length === 0) {
+  if (state.championPool.length === 0) {
     return <EmptyLines />;
   }
 
   return (
     <div className="champion-list">
+      {state.championCatalogStatus === "loading" ? (
+        <span className="champion-list-hint">Synchronisation des noms de champions...</span>
+      ) : null}
       {championRows.map((row) => (
         <button
           className="champion-row"
-          type="button"
+          disabled={!row.championId}
           key={row.id}
+          type="button"
           onClick={() => {
             if (row.championId) {
               void openChampionDetail(row.championId);
@@ -112,7 +119,10 @@ function ChampionPool({ masteries }: { masteries: ChampionMastery[] }): React.JS
   );
 }
 
-function useChampionRows(masteries: ChampionMastery[], catalog: ChampionDetail[]): Array<{
+function useChampionRows(
+  masteries: ChampionMastery[],
+  catalog: ChampionDetail[],
+): Array<{
   championId?: string;
   iconUrl?: string;
   id: string;
@@ -121,16 +131,16 @@ function useChampionRows(masteries: ChampionMastery[], catalog: ChampionDetail[]
 }> {
   return useMemo(
     () =>
-      masteries.map((mastery) => {
-        const id = mastery.championId?.toString() ?? crypto.randomUUID();
+      masteries.map((mastery, index) => {
+        const id = mastery.championId?.toString() ?? `unknown-${index}`;
         const champion = catalog.find((item) => item.key === id);
 
         return {
           championId: champion?.id,
-          id,
           iconUrl: champion?.iconUrl,
+          id,
           name: champion?.name ?? `Champion ${id}`,
-          subtitle: `M${mastery.championLevel ?? "-"} · ${formatPoints(mastery.championPoints)} pts`,
+          subtitle: `M${mastery.championLevel ?? "-"} - ${formatPoints(mastery.championPoints)} pts`,
         };
       }),
     [catalog, masteries],

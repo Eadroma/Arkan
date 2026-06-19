@@ -81,7 +81,7 @@ export function useAppActions(): {
     }
 
     const status = await leagueClientStatus();
-    applyLeagueClientStatus(status, dispatch, state.search.region);
+    await applyLeagueClientStatus(status, dispatch, state.search.region);
   }, [dispatch, state.search.region]);
 
   const searchRiotAccount = useCallback(async () => {
@@ -120,9 +120,10 @@ export function useAppActions(): {
 
   const resetToConnectedPlayer = useCallback(() => {
     dispatch({ search: { input: "" }, type: "searchChanged" });
+    dispatch({ profile: state.connectedPlayerProfile, type: "playerProfileChanged" });
     dispatch({ pool: state.connectedChampionPool, type: "championPoolChanged" });
     dispatch({ type: "viewChanged", view: "profile" });
-  }, [dispatch, state.connectedChampionPool]);
+  }, [dispatch, state.connectedChampionPool, state.connectedPlayerProfile]);
 
   return {
     detectLeagueClient,
@@ -134,11 +135,11 @@ export function useAppActions(): {
   };
 }
 
-function applyLeagueClientStatus(
+async function applyLeagueClientStatus(
   status: LeagueClientStatus,
   dispatch: ReturnType<typeof useAppStore>["dispatch"],
   region: string,
-): void {
+): Promise<void> {
   if (!status.detected) {
     dispatch({
       card: {
@@ -168,21 +169,26 @@ function applyLeagueClientStatus(
   }
 
   const summoner = status.summoner;
+  const version = await latestDataDragonVersion();
   const displayName = summoner.gameName && summoner.tagLine
     ? `${summoner.gameName}#${summoner.tagLine}`
     : summoner.displayName;
   const profile = {
     championMasteries: summoner.championMasteries ?? [],
     displayName,
-    iconUrl: undefined,
+    iconUrl:
+      summoner.profileIconId === undefined ? undefined : profileIconUrl(version, summoner.profileIconId),
     kicker: "Joueur connecte detecte",
     level: summoner.summonerLevel?.toString() ?? "--",
     region,
     status: "Detected",
   };
 
-  dispatch({ profile, type: "playerProfileChanged" });
-  dispatch({ pool: summoner.championMasteries ?? [], type: "championPoolChanged" });
+  dispatch({
+    pool: summoner.championMasteries ?? [],
+    profile,
+    type: "connectedPlayerChanged",
+  });
   dispatch({
     card: {
       level: summoner.summonerLevel?.toString() ?? "--",
