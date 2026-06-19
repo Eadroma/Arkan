@@ -494,9 +494,7 @@ async fn hydrate_current_summoner_champion_pool(
         return;
     };
 
-    if summoner.puuid.is_none() {
-        hydrate_current_summoner_account_identity(&client, summoner).await;
-    }
+    hydrate_current_summoner_account_identity(&client, summoner).await;
 
     let Some(puuid) = summoner.puuid.as_deref() else {
         return;

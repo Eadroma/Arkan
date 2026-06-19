@@ -839,7 +839,7 @@ select {
   grid-template-areas:
     "runes runes spells source"
     "matchups matchups matchups matchups"
-    "priority skills skills skills"
+    "skills skills skills skills"
     "items items items items";
   grid-template-columns:
     minmax(260px, 0.9fr) minmax(260px, 1fr) minmax(250px, 0.9fr)
@@ -876,10 +876,6 @@ select {
 
 .matchups-module {
   grid-area: matchups;
-}
-
-.skill-priority-module {
-  grid-area: priority;
 }
 
 .skill-path-module {
@@ -940,6 +936,20 @@ select {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.skill-priority-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 10px;
+
+  > span {
+    color: var(--text-main);
+    font-size: 12px;
+    font-weight: 800;
+  }
 }
 
 .spell-card {
@@ -1071,7 +1081,6 @@ select {
       "spells"
       "source"
       "matchups"
-      "priority"
       "skills"
       "items";
     grid-template-columns: 1fr;

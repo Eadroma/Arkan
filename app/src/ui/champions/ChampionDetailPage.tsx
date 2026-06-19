@@ -44,7 +44,6 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
         <SummonerSpellsModule assets={assets} champion={champion} />
         <DataSourceModule />
         <MatchupsModule />
-        <SkillPriority champion={champion} />
         <SkillPath champion={champion} />
         <BestBuild champion={champion} />
       </section>
@@ -288,15 +287,12 @@ function MatchupsModule(): React.JSX.Element {
   );
 }
 
-function SkillPriority({ champion }: { champion: ChampionDetail }): React.JSX.Element {
+function SkillPriorityIcons({ champion }: { champion: ChampionDetail }): React.JSX.Element {
   const primarySpells = champion.spells.slice(0, 3);
 
   return (
-    <article className="build-module skill-priority-module">
-      <div className="module-header">
-        <h3>Skill Priority</h3>
-        <strong>-- WR</strong>
-      </div>
+    <div className="skill-priority-inline" aria-label="Skill priority">
+      <span>Skill Priority</span>
       <div className="skill-priority-icons">
         {primarySpells.map((spell, index) => (
           <div className="priority-icon" key={spell.name}>
@@ -305,7 +301,7 @@ function SkillPriority({ champion }: { champion: ChampionDetail }): React.JSX.El
           </div>
         ))}
       </div>
-    </article>
+    </div>
   );
 }
 
@@ -357,6 +353,7 @@ function SkillPath({ champion }: { champion: ChampionDetail }): React.JSX.Elemen
           );
         })}
       </div>
+      <SkillPriorityIcons champion={champion} />
     </article>
   );
 }
