@@ -5,6 +5,7 @@ import { useAppStore } from "../store/appStore";
 import { ChampionDetailPage } from "./champions/ChampionDetailPage";
 import { ChampionCatalogView } from "./champions/ChampionCatalogView";
 import { Shell } from "./layout/Shell";
+import { MatchDetailPage } from "./matches/MatchDetailPage";
 import { ProfileView } from "./profile/ProfileView";
 
 export function App(): React.JSX.Element {
@@ -22,6 +23,7 @@ export function App(): React.JSX.Element {
       {state.view === "champion-detail" && state.selectedChampion ? (
         <ChampionDetailPage champion={state.selectedChampion} />
       ) : null}
+      {state.view === "match-detail" ? <MatchDetailPage /> : null}
     </Shell>
   );
 }

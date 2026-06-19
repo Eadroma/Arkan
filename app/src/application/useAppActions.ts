@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 
 import { latestDataDragonVersion, loadChampionDetail, loadChampionIndex, profileIconUrl } from "./dataDragonApi";
-import { hasTauriRuntime, leagueClientStatus, matchHistory, resolveRiotAccount } from "./tauriApi";
+import { hasTauriRuntime, leagueClientStatus, matchDetail, matchHistory, resolveRiotAccount } from "./tauriApi";
 import type { ChampionDetail } from "../domain/champion";
 import type { ChampionMastery, LeagueClientStatus, RiotAccount } from "../domain/league";
 import { useAppStore, type ViewName } from "../store/appStore";
@@ -11,6 +11,7 @@ export function useAppActions(): {
   loadChampionCatalog: () => Promise<void>;
   loadMatchHistoryForDisplayedPlayer: () => Promise<void>;
   openChampionDetail: (championId: string) => Promise<void>;
+  openMatchDetail: (matchId: string) => Promise<void>;
   resetToConnectedPlayer: () => void;
   searchRiotAccount: () => Promise<void>;
   setView: (view: ViewName) => Promise<void>;
@@ -103,6 +104,21 @@ export function useAppActions(): {
     }
   }, [dispatch, state.playerProfile.displayName, state.playerProfile.region, state.search.region]);
 
+  const openMatchDetail = useCallback(
+    async (matchId: string) => {
+      dispatch({ matchId, type: "matchDetailLoadingStarted" });
+
+      try {
+        await loadChampionCatalog();
+        const detail = await matchDetail(matchId, state.playerProfile.region || state.search.region);
+        dispatch({ detail, type: "matchDetailLoaded" });
+      } catch {
+        dispatch({ type: "matchDetailLoadingFailed" });
+      }
+    },
+    [dispatch, loadChampionCatalog, state.playerProfile.region, state.search.region],
+  );
+
   const searchRiotAccount = useCallback(async () => {
     const input = state.search.input.trim();
 
@@ -149,6 +165,7 @@ export function useAppActions(): {
     loadChampionCatalog,
     loadMatchHistoryForDisplayedPlayer,
     openChampionDetail,
+    openMatchDetail,
     resetToConnectedPlayer,
     searchRiotAccount,
     setView,

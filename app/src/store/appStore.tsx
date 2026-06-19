@@ -2,8 +2,9 @@ import { createContext, useContext, useMemo, useReducer, type Dispatch, type Rea
 
 import type { ChampionDetail, ChampionSummary, ChampionTag } from "../domain/champion";
 import type { ChampionMastery, LeagueClientCard, MatchHistoryEntry, PlayerProfile } from "../domain/league";
+import type { MatchDetail } from "../domain/match";
 
-export type ViewName = "champion-detail" | "champions" | "profile";
+export type ViewName = "champion-detail" | "champions" | "match-detail" | "profile";
 
 export type ChampionCatalogFilters = {
   minPickRate: string;
@@ -32,6 +33,7 @@ export type AppState = {
   connectedChampionPool: ChampionMastery[];
   leagueClient: LeagueClientCard;
   matchHistory: MatchHistoryState;
+  matchDetail: MatchDetailState;
   playerProfile: PlayerProfile;
   search: SearchState;
   selectedChampion?: ChampionDetail;
@@ -42,6 +44,12 @@ export type AppState = {
 
 export type MatchHistoryState = {
   entries: MatchHistoryEntry[];
+  status: "idle" | "loading" | "ready" | "error";
+};
+
+export type MatchDetailState = {
+  detail?: MatchDetail;
+  matchId?: string;
   status: "idle" | "loading" | "ready" | "error";
 };
 
@@ -58,6 +66,9 @@ export type AppAction =
   | { card: LeagueClientCard; type: "leagueClientChanged" }
   | { entries: MatchHistoryEntry[]; type: "matchHistoryLoaded" }
   | { status: MatchHistoryState["status"]; type: "matchHistoryStatusChanged" }
+  | { detail: MatchDetail; type: "matchDetailLoaded" }
+  | { matchId: string; type: "matchDetailLoadingStarted" }
+  | { type: "matchDetailLoadingFailed" }
   | { role: string; type: "selectedChampionRoleChanged" }
   | { search: Partial<SearchState>; type: "searchChanged" }
   | { collapsed: boolean; type: "sidebarChanged" }
@@ -96,6 +107,9 @@ const initialState: AppState = {
   leagueClient: defaultLeagueClient,
   matchHistory: {
     entries: [],
+    status: "idle",
+  },
+  matchDetail: {
     status: "idle",
   },
   playerProfile: defaultPlayerProfile,
@@ -207,6 +221,34 @@ function appReducer(state: AppState, action: AppAction): AppState {
           entries: action.status === "loading" ? [] : state.matchHistory.entries,
           status: action.status,
         },
+      };
+    case "matchDetailLoadingStarted":
+      return {
+        ...state,
+        matchDetail: {
+          matchId: action.matchId,
+          status: "loading",
+        },
+        view: "match-detail",
+      };
+    case "matchDetailLoaded":
+      return {
+        ...state,
+        matchDetail: {
+          detail: action.detail,
+          matchId: action.detail.matchId,
+          status: "ready",
+        },
+        view: "match-detail",
+      };
+    case "matchDetailLoadingFailed":
+      return {
+        ...state,
+        matchDetail: {
+          ...state.matchDetail,
+          status: "error",
+        },
+        view: "match-detail",
       };
     case "playerProfileChanged":
       return {

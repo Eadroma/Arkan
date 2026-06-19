@@ -83,6 +83,8 @@ export function ProfileView(): React.JSX.Element {
 
 function MatchHistoryList(): React.JSX.Element {
   const { state } = useAppStore();
+  const { openMatchDetail } = useAppActions();
+  const championIconByKey = useChampionIconByKey(state.championCatalog);
 
   if (state.matchHistory.status === "loading") {
     return <EmptyLines />;
@@ -99,18 +101,36 @@ function MatchHistoryList(): React.JSX.Element {
   return (
     <div className="match-history-list">
       {state.matchHistory.entries.map((entry) => (
-        <MatchHistoryRow entry={entry} key={entry.matchId} />
+        <MatchHistoryRow
+          entry={entry}
+          iconUrl={championIconByKey.get(entry.championId.toString())}
+          key={entry.matchId}
+          onOpen={() => {
+            void openMatchDetail(entry.matchId);
+          }}
+        />
       ))}
     </div>
   );
 }
 
-function MatchHistoryRow({ entry }: { entry: MatchHistoryEntry }): React.JSX.Element {
+function MatchHistoryRow({
+  entry,
+  iconUrl,
+  onOpen,
+}: {
+  entry: MatchHistoryEntry;
+  iconUrl?: string;
+  onOpen: () => void;
+}): React.JSX.Element {
   return (
-    <article className="match-history-row" data-result={entry.win ? "win" : "loss"}>
-      <div>
-        <strong>{entry.win ? "Victoire" : "Defaite"}</strong>
-        <span>{queueLabel(entry.queueId)} - {entry.role}</span>
+    <button className="match-history-row" data-result={entry.win ? "win" : "loss"} type="button" onClick={onOpen}>
+      <div className="match-history-row__result">
+        {iconUrl ? <img src={iconUrl} alt="" /> : <span className="match-history-row__fallback">?</span>}
+        <div>
+          <strong>{entry.win ? "Victoire" : "Defaite"}</strong>
+          <span>{queueLabel(entry.queueId)} - {entry.role}</span>
+        </div>
       </div>
       <div>
         <strong>{entry.championName}</strong>
@@ -120,7 +140,11 @@ function MatchHistoryRow({ entry }: { entry: MatchHistoryEntry }): React.JSX.Ele
         <strong>{entry.kills}/{entry.deaths}/{entry.assists}</strong>
         <span>KDA</span>
       </div>
-    </article>
+      <div className="match-history-row__lp">
+        <strong>{formatLpDelta(entry.lpDelta)}</strong>
+        <span>LP</span>
+      </div>
+    </button>
   );
 }
 
@@ -189,8 +213,23 @@ function useChampionRows(
   );
 }
 
+function useChampionIconByKey(catalog: ChampionDetail[]): Map<string, string> {
+  return useMemo(
+    () => new Map(catalog.map((champion) => [champion.key, champion.iconUrl])),
+    [catalog],
+  );
+}
+
 function formatPoints(value?: number): string {
   return value === undefined ? "--" : new Intl.NumberFormat("fr-FR").format(value);
+}
+
+function formatLpDelta(value: number | null): string {
+  if (value === null) {
+    return "--";
+  }
+
+  return value > 0 ? `+${value}` : value.toString();
 }
 
 function formatDuration(seconds: number): string {

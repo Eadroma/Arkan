@@ -49,15 +49,69 @@ struct RiotChampionMasteryResponse {
 #[serde(rename_all = "camelCase")]
 struct MatchHistoryEntry {
     assists: u32,
+    champion_id: u32,
     champion_name: String,
     deaths: u32,
     duration_seconds: u64,
     game_created_at: i64,
     kills: u32,
+    lp_delta: Option<i32>,
     match_id: String,
     queue_id: u32,
     role: String,
     win: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MatchDetailResponse {
+    duration_seconds: u64,
+    game_created_at: i64,
+    match_id: String,
+    queue_id: u32,
+    teams: Vec<MatchTeam>,
+    timeline: Vec<MatchTimelinePoint>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MatchTeam {
+    participants: Vec<MatchParticipant>,
+    result: String,
+    team_id: u32,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MatchParticipant {
+    assists: u32,
+    champion_id: u32,
+    champion_level: u32,
+    champion_name: String,
+    cs: u32,
+    deaths: u32,
+    gold_earned: u32,
+    items: Vec<u32>,
+    kills: u32,
+    participant_id: u32,
+    riot_id: String,
+    summoner_spell_ids: Vec<u32>,
+    team_position: String,
+    total_damage_to_champions: u32,
+    vision_score: u32,
+    win: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MatchTimelinePoint {
+    blue_damage: u32,
+    blue_gold: u32,
+    blue_xp: u32,
+    minute: u32,
+    red_damage: u32,
+    red_gold: u32,
+    red_xp: u32,
 }
 
 #[tauri::command]
@@ -99,6 +153,30 @@ async fn resolve_riot_account(input: &str, platform: &str) -> Result<RiotAccount
         summoner_level: summoner.as_ref().map(|summoner| summoner.summoner_level),
         champion_masteries,
     })
+}
+
+#[tauri::command]
+async fn match_detail(match_id: &str, platform: &str) -> Result<MatchDetailResponse, String> {
+    let config = arkan_core::AppConfig::from_env().map_err(|error| error.to_string())?;
+    let api_key = config
+        .riot_api_key()
+        .ok_or_else(|| "Riot API key is missing".to_owned())?;
+    let platform = platform
+        .parse::<arkan_core::PlatformRoute>()
+        .map_err(|error| error.to_string())?;
+    let client = arkan_core::RiotApiClient::new(api_key).map_err(|error| error.to_string())?;
+    let route = platform.regional_route();
+    let detail = client
+        .match_by_id(route, match_id)
+        .await
+        .map_err(|error| error.to_string())?;
+    let timeline = client
+        .match_timeline_by_id(route, match_id)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    match_detail_response_from_values(&detail, &timeline)
+        .ok_or_else(|| "Unable to parse match detail".to_owned())
 }
 
 #[tauri::command]
@@ -638,11 +716,13 @@ fn match_history_entry_from_detail(detail: &Value, puuid: &str) -> Option<MatchH
 
     Some(MatchHistoryEntry {
         assists: participant.get("assists")?.as_u64()?.try_into().ok()?,
+        champion_id: participant.get("championId")?.as_u64()?.try_into().ok()?,
         champion_name: participant.get("championName")?.as_str()?.to_owned(),
         deaths: participant.get("deaths")?.as_u64()?.try_into().ok()?,
         duration_seconds: info.get("gameDuration")?.as_u64()?,
         game_created_at: info.get("gameCreation")?.as_i64()?,
         kills: participant.get("kills")?.as_u64()?.try_into().ok()?,
+        lp_delta: None,
         match_id,
         queue_id: info.get("queueId")?.as_u64()?.try_into().ok()?,
         role: participant
@@ -653,6 +733,165 @@ fn match_history_entry_from_detail(detail: &Value, puuid: &str) -> Option<MatchH
             .to_owned(),
         win: participant.get("win")?.as_bool()?,
     })
+}
+
+fn match_detail_response_from_values(
+    detail: &Value,
+    timeline: &Value,
+) -> Option<MatchDetailResponse> {
+    let info = detail.get("info")?;
+    let metadata = detail.get("metadata")?;
+    let participants = info.get("participants")?.as_array()?;
+    let mut blue = Vec::new();
+    let mut red = Vec::new();
+
+    for participant in participants {
+        let parsed = match_participant_from_value(participant)?;
+
+        if participant.get("teamId")?.as_u64()? == 100 {
+            blue.push(parsed);
+        } else {
+            red.push(parsed);
+        }
+    }
+
+    let blue_result = team_result(&blue);
+    let red_result = team_result(&red);
+
+    Some(MatchDetailResponse {
+        duration_seconds: info.get("gameDuration")?.as_u64()?,
+        game_created_at: info.get("gameCreation")?.as_i64()?,
+        match_id: metadata.get("matchId")?.as_str()?.to_owned(),
+        queue_id: info.get("queueId")?.as_u64()?.try_into().ok()?,
+        teams: vec![
+            MatchTeam {
+                participants: blue,
+                result: blue_result,
+                team_id: 100,
+            },
+            MatchTeam {
+                participants: red,
+                result: red_result,
+                team_id: 200,
+            },
+        ],
+        timeline: match_timeline_points_from_value(timeline),
+    })
+}
+
+fn match_participant_from_value(participant: &Value) -> Option<MatchParticipant> {
+    let game_name = participant
+        .get("riotIdGameName")
+        .and_then(Value::as_str)
+        .or_else(|| participant.get("summonerName").and_then(Value::as_str))
+        .unwrap_or("Unknown");
+    let tag_line = participant
+        .get("riotIdTagline")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let riot_id = if tag_line.is_empty() {
+        game_name.to_owned()
+    } else {
+        format!("{game_name}#{tag_line}")
+    };
+
+    Some(MatchParticipant {
+        assists: value_u32(participant, "assists"),
+        champion_id: value_u32(participant, "championId"),
+        champion_level: value_u32(participant, "champLevel"),
+        champion_name: participant.get("championName")?.as_str()?.to_owned(),
+        cs: value_u32(participant, "totalMinionsKilled")
+            + value_u32(participant, "neutralMinionsKilled"),
+        deaths: value_u32(participant, "deaths"),
+        gold_earned: value_u32(participant, "goldEarned"),
+        items: (0..=6)
+            .map(|slot| value_u32(participant, &format!("item{slot}")))
+            .filter(|item| *item > 0)
+            .collect(),
+        kills: value_u32(participant, "kills"),
+        participant_id: value_u32(participant, "participantId"),
+        riot_id,
+        summoner_spell_ids: vec![
+            value_u32(participant, "summoner1Id"),
+            value_u32(participant, "summoner2Id"),
+        ],
+        team_position: participant
+            .get("teamPosition")
+            .and_then(Value::as_str)
+            .filter(|role| !role.is_empty())
+            .unwrap_or("UNKNOWN")
+            .to_owned(),
+        total_damage_to_champions: value_u32(participant, "totalDamageDealtToChampions"),
+        vision_score: value_u32(participant, "visionScore"),
+        win: participant.get("win")?.as_bool()?,
+    })
+}
+
+fn team_result(participants: &[MatchParticipant]) -> String {
+    if participants.iter().any(|participant| participant.win) {
+        "Victory".to_owned()
+    } else {
+        "Defeat".to_owned()
+    }
+}
+
+fn match_timeline_points_from_value(timeline: &Value) -> Vec<MatchTimelinePoint> {
+    timeline
+        .get("info")
+        .and_then(|info| info.get("frames"))
+        .and_then(Value::as_array)
+        .map(|frames| {
+            frames
+                .iter()
+                .filter_map(match_timeline_point_from_frame)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn match_timeline_point_from_frame(frame: &Value) -> Option<MatchTimelinePoint> {
+    let minute = frame.get("timestamp")?.as_u64()? / 60_000;
+    let participant_frames = frame.get("participantFrames")?.as_object()?;
+    let mut point = MatchTimelinePoint {
+        blue_damage: 0,
+        blue_gold: 0,
+        blue_xp: 0,
+        minute: minute.try_into().ok()?,
+        red_damage: 0,
+        red_gold: 0,
+        red_xp: 0,
+    };
+
+    for (id, participant_frame) in participant_frames {
+        let participant_id = id.parse::<u32>().ok()?;
+        let is_blue = participant_id <= 5;
+        let damage = participant_frame
+            .get("damageStats")
+            .map(|stats| value_u32(stats, "totalDamageDoneToChampions"))
+            .unwrap_or(0);
+        let gold = value_u32(participant_frame, "totalGold");
+        let xp = value_u32(participant_frame, "xp");
+
+        if is_blue {
+            point.blue_damage += damage;
+            point.blue_gold += gold;
+            point.blue_xp += xp;
+        } else {
+            point.red_damage += damage;
+            point.red_gold += gold;
+            point.red_xp += xp;
+        }
+    }
+
+    Some(point)
+}
+
+fn value_u32(value: &Value, key: &str) -> u32 {
+    value
+        .get(key)
+        .and_then(Value::as_u64)
+        .and_then(|number| number.try_into().ok())
+        .unwrap_or(0)
 }
 
 async fn hydrate_current_summoner_account_identity(
@@ -687,6 +926,7 @@ fn main() {
             resolve_riot_account,
             local_database_status,
             match_history,
+            match_detail,
             league_client_status
         ])
         .run(tauri::generate_context!())
@@ -824,6 +1064,7 @@ mod tests {
                 "participants": [
                     {
                         "puuid": "other-puuid",
+                        "championId": 1,
                         "championName": "Annie",
                         "kills": 1,
                         "deaths": 2,
@@ -833,6 +1074,7 @@ mod tests {
                     },
                     {
                         "puuid": "player-puuid",
+                        "championId": 166,
                         "championName": "Akshan",
                         "kills": 12,
                         "deaths": 4,
@@ -847,11 +1089,120 @@ mod tests {
         let entry = match_history_entry_from_detail(&detail, "player-puuid").unwrap();
 
         assert_eq!(entry.match_id, "EUW1_123");
+        assert_eq!(entry.champion_id, 166);
         assert_eq!(entry.champion_name, "Akshan");
+        assert_eq!(entry.lp_delta, None);
         assert_eq!(entry.kills, 12);
         assert_eq!(entry.deaths, 4);
         assert_eq!(entry.assists, 8);
         assert_eq!(entry.role, "BOTTOM");
         assert!(entry.win);
+    }
+
+    #[test]
+    fn extracts_match_detail_with_team_timeline() {
+        let detail = serde_json::json!({
+            "metadata": {
+                "matchId": "EUW1_456"
+            },
+            "info": {
+                "gameCreation": 1710000000000_i64,
+                "gameDuration": 1820,
+                "queueId": 420,
+                "participants": [
+                    {
+                        "participantId": 1,
+                        "teamId": 100,
+                        "riotIdGameName": "BlueCarry",
+                        "riotIdTagline": "EUW",
+                        "championId": 22,
+                        "championName": "Ashe",
+                        "champLevel": 15,
+                        "kills": 10,
+                        "deaths": 2,
+                        "assists": 7,
+                        "teamPosition": "BOTTOM",
+                        "totalDamageDealtToChampions": 23000,
+                        "goldEarned": 14500,
+                        "totalMinionsKilled": 220,
+                        "neutralMinionsKilled": 12,
+                        "visionScore": 18,
+                        "item0": 6672,
+                        "item1": 3006,
+                        "item2": 0,
+                        "item3": 3031,
+                        "item4": 0,
+                        "item5": 0,
+                        "item6": 3363,
+                        "summoner1Id": 4,
+                        "summoner2Id": 7,
+                        "win": true
+                    },
+                    {
+                        "participantId": 6,
+                        "teamId": 200,
+                        "riotIdGameName": "RedCarry",
+                        "riotIdTagline": "EUW",
+                        "championId": 51,
+                        "championName": "Caitlyn",
+                        "champLevel": 14,
+                        "kills": 5,
+                        "deaths": 6,
+                        "assists": 4,
+                        "teamPosition": "BOTTOM",
+                        "totalDamageDealtToChampions": 18000,
+                        "goldEarned": 12100,
+                        "totalMinionsKilled": 205,
+                        "neutralMinionsKilled": 0,
+                        "visionScore": 12,
+                        "item0": 6671,
+                        "item1": 3006,
+                        "item2": 3031,
+                        "item3": 0,
+                        "item4": 0,
+                        "item5": 0,
+                        "item6": 3363,
+                        "summoner1Id": 4,
+                        "summoner2Id": 21,
+                        "win": false
+                    }
+                ]
+            }
+        });
+        let timeline = serde_json::json!({
+            "info": {
+                "frames": [
+                    {
+                        "timestamp": 60000,
+                        "participantFrames": {
+                            "1": {
+                                "totalGold": 520,
+                                "xp": 280,
+                                "damageStats": { "totalDamageDoneToChampions": 120 }
+                            },
+                            "6": {
+                                "totalGold": 500,
+                                "xp": 260,
+                                "damageStats": { "totalDamageDoneToChampions": 90 }
+                            }
+                        }
+                    }
+                ]
+            }
+        });
+
+        let response = match_detail_response_from_values(&detail, &timeline).unwrap();
+
+        assert_eq!(response.match_id, "EUW1_456");
+        assert_eq!(response.teams[0].result, "Victory");
+        assert_eq!(response.teams[0].participants[0].riot_id, "BlueCarry#EUW");
+        assert_eq!(response.teams[0].participants[0].cs, 232);
+        assert_eq!(
+            response.teams[0].participants[0].items,
+            vec![6672, 3006, 3031, 3363]
+        );
+        assert_eq!(response.timeline[0].minute, 1);
+        assert_eq!(response.timeline[0].blue_gold, 520);
+        assert_eq!(response.timeline[0].red_damage, 90);
     }
 }

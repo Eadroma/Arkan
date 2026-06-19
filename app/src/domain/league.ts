@@ -41,11 +41,13 @@ export type PlayerProfile = {
 
 export type MatchHistoryEntry = {
   assists: number;
+  championId: number;
   championName: string;
   deaths: number;
   durationSeconds: number;
   gameCreatedAt: number;
   kills: number;
+  lpDelta: number | null;
   matchId: string;
   queueId: number;
   role: string;

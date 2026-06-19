@@ -127,6 +127,10 @@ export function spellIconUrl(version: string, image: string): string {
   return `${dataDragonRoot}/cdn/${version}/img/spell/${image}`;
 }
 
+export function itemIconUrl(version: string, itemId: number): string {
+  return `${dataDragonRoot}/cdn/${version}/img/item/${itemId}.png`;
+}
+
 export function passiveIconUrl(version: string, image: string): string {
   return `${dataDragonRoot}/cdn/${version}/img/passive/${image}`;
 }
