@@ -1,6 +1,7 @@
-import { useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
-import { itemIconUrl } from "../../application/dataDragonApi";
+import { itemIconUrl, loadGameAssets, spellIconUrl } from "../../application/dataDragonApi";
+import type { SummonerSpell } from "../../domain/assets";
 import type { MatchDetail, MatchParticipant, MatchTeam, MatchTimelinePoint } from "../../domain/match";
 import { useAppActions } from "../../application/useAppActions";
 import { useAppStore } from "../../store/appStore";
@@ -46,6 +47,7 @@ function LoadedMatchDetail({ detail }: { detail: MatchDetail }): React.JSX.Eleme
     [state.championCatalog],
   );
   const version = state.championCatalog[0]?.version;
+  const spellByKey = useSummonerSpellByKey(version);
 
   return (
     <section className="match-detail-page">
@@ -65,6 +67,7 @@ function LoadedMatchDetail({ detail }: { detail: MatchDetail }): React.JSX.Eleme
             championIconByKey={championIconByKey}
             itemVersion={version}
             key={team.teamId}
+            spellByKey={spellByKey}
             team={team}
           />
         ))}
@@ -76,10 +79,12 @@ function LoadedMatchDetail({ detail }: { detail: MatchDetail }): React.JSX.Eleme
 function TeamTable({
   championIconByKey,
   itemVersion,
+  spellByKey,
   team,
 }: {
   championIconByKey: Map<string, string>;
   itemVersion?: string;
+  spellByKey: Map<number, SummonerSpell>;
   team: MatchTeam;
 }): React.JSX.Element {
   const teamName = team.teamId === 100 ? "Blue Team" : "Red Team";
@@ -102,6 +107,7 @@ function TeamTable({
           itemVersion={itemVersion}
           key={participant.participantId}
           participant={participant}
+          spellByKey={spellByKey}
         />
       ))}
     </section>
@@ -112,10 +118,12 @@ function ParticipantRow({
   championIconUrl,
   itemVersion,
   participant,
+  spellByKey,
 }: {
   championIconUrl?: string;
   itemVersion?: string;
   participant: MatchParticipant;
+  spellByKey: Map<number, SummonerSpell>;
 }): React.JSX.Element {
   const { openPlayerProfile } = useAppActions();
 
@@ -129,6 +137,22 @@ function ParticipantRow({
       >
         {championIconUrl ? <img src={championIconUrl} alt="" /> : <span className="participant-row__fallback">?</span>}
         <span className="participant-row__level">{participant.championLevel}</span>
+        <div className="participant-spells">
+          {participant.summonerSpellIds.map((spellId) => {
+            const spell = spellByKey.get(spellId);
+
+            return spell && itemVersion ? (
+              <img
+                alt={spell.name}
+                key={spellId}
+                src={spellIconUrl(itemVersion, spell.image.full)}
+                title={spell.description}
+              />
+            ) : (
+              <span key={spellId}>{spellId}</span>
+            );
+          })}
+        </div>
         <div>
           <strong>{participant.riotId}</strong>
           <span>{participant.teamPosition}</span>
@@ -150,6 +174,36 @@ function ParticipantRow({
       </div>
     </div>
   );
+}
+
+function useSummonerSpellByKey(version?: string): Map<number, SummonerSpell> {
+  const [spells, setSpells] = useState<Map<number, SummonerSpell>>(new Map());
+
+  useEffect(() => {
+    if (!version) {
+      return;
+    }
+
+    let isMounted = true;
+
+    void loadGameAssets(version).then((assets) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setSpells(
+        new Map(
+          Object.values(assets.summonerSpells).map((spell) => [Number(spell.key), spell]),
+        ),
+      );
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [version]);
+
+  return spells;
 }
 
 function DamageCell({ value }: { value: number }): React.JSX.Element {
