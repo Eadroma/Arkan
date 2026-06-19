@@ -12,7 +12,6 @@ import {
   extractRecommendedBuild,
   roleLabel,
   type ChampionDetail,
-  type ChampionSpell,
 } from "../../domain/champion";
 import { useAppActions } from "../../application/useAppActions";
 import { useAppStore } from "../../store/appStore";
@@ -20,11 +19,23 @@ import { Button } from "../components/Button";
 
 const spellKeys = ["Q", "W", "E", "R"] as const;
 
+type AbilityInfo = {
+  cooldown?: string;
+  cost?: string;
+  description: string;
+  iconUrl: string;
+  key: string;
+  name: string;
+  range?: string;
+};
+
 export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): React.JSX.Element {
   const { state } = useAppStore();
   const { setView } = useAppActions();
   const [assets, setAssets] = useState<GameAssets | null>(null);
   const role = state.selectedChampionRole;
+  const abilities = useChampionAbilities(champion);
+  const selectedAbility = abilities.find((ability) => ability.key === state.abilityPanel.abilityKey);
 
   useEffect(() => {
     void loadGameAssets(champion.version).then(setAssets);
@@ -32,7 +43,13 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
 
   return (
     <section className="dashboard champion-build-page">
-      <ChampionHero champion={champion} role={role} onBack={() => void setView("champions")} />
+      <ChampionHero
+        abilities={abilities}
+        champion={champion}
+        role={role}
+        onBack={() => void setView("champions")}
+      />
+      {selectedAbility ? <AbilityPanel ability={selectedAbility} /> : null}
       <nav className="build-tabs" aria-label="Champion build tabs">
         <button className="active" type="button">Build</button>
         <button type="button">Counters</button>
@@ -52,10 +69,12 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
 }
 
 function ChampionHero({
+  abilities,
   champion,
   onBack,
   role,
 }: {
+  abilities: AbilityInfo[];
   champion: ChampionDetail;
   onBack: () => void;
   role: string;
@@ -75,16 +94,15 @@ function ChampionHero({
             <span className="patch-badge">Patch {champion.version}</span>
           </div>
           <p>{champion.title}</p>
-          <AbilityStrip champion={champion} />
+          <AbilityStrip abilities={abilities} />
         </div>
       </div>
     </section>
   );
 }
 
-function AbilityStrip({ champion }: { champion: ChampionDetail }): React.JSX.Element {
-  const { dispatch, state } = useAppStore();
-  const abilities = useMemo(
+function useChampionAbilities(champion: ChampionDetail): AbilityInfo[] {
+  return useMemo(
     () => [
       {
         description: champion.passive?.description ?? "",
@@ -106,34 +124,34 @@ function AbilityStrip({ champion }: { champion: ChampionDetail }): React.JSX.Ele
     ],
     [champion],
   );
-  const selectedAbility = abilities.find((ability) => ability.key === state.abilityPanel.abilityKey);
+}
+
+function AbilityStrip({ abilities }: { abilities: AbilityInfo[] }): React.JSX.Element {
+  const { dispatch, state } = useAppStore();
 
   return (
-    <>
-      <div className="ability-strip">
-        {abilities.map((ability) => (
-          <button
-            className="ability-chip"
-            data-active={selectedAbility?.key === ability.key}
-            key={ability.key}
-            title={ability.name}
-            type="button"
-            onClick={() => dispatch({ abilityKey: ability.key, type: "abilityPanelToggled" })}
-          >
-            <img alt="" src={ability.iconUrl} />
-            <span>{ability.key}</span>
-          </button>
-        ))}
-      </div>
-      {selectedAbility ? <AbilityPanel ability={selectedAbility} /> : null}
-    </>
+    <div className="ability-strip">
+      {abilities.map((ability) => (
+        <button
+          className="ability-chip"
+          data-active={state.abilityPanel.abilityKey === ability.key}
+          key={ability.key}
+          title={ability.name}
+          type="button"
+          onClick={() => dispatch({ abilityKey: ability.key, type: "abilityPanelToggled" })}
+        >
+          <img alt="" src={ability.iconUrl} />
+          <span>{ability.key}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
 function AbilityPanel({
   ability,
 }: {
-  ability: { cooldown?: string; cost?: string; description: string; key: string; name: string; range?: string };
+  ability: AbilityInfo;
 }): React.JSX.Element {
   const stats = [
     ["Cooldown", ability.cooldown],
