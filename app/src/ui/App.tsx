@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { startExclusivePolling } from "../application/polling";
 import { useAppActions } from "../application/useAppActions";
 import { useAppStore } from "../store/appStore";
 import { ChampionDetailPage } from "./champions/ChampionDetailPage";
@@ -13,7 +14,7 @@ export function App(): React.JSX.Element {
   const { detectLeagueClient } = useAppActions();
 
   useEffect(() => {
-    void detectLeagueClient();
+    return startExclusivePolling(detectLeagueClient, 5_000);
   }, [detectLeagueClient]);
 
   return (

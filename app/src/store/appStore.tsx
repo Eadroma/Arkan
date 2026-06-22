@@ -193,12 +193,15 @@ function appReducer(state: AppState, action: AppAction): AppState {
         },
       };
     case "connectedPlayerChanged":
+      const isViewingConnectedPlayer =
+        state.playerProfile.displayName === state.connectedPlayerProfile.displayName;
+
       return {
         ...state,
-        championPool: action.pool,
+        championPool: isViewingConnectedPlayer ? action.pool : state.championPool,
         connectedChampionPool: action.pool,
         connectedPlayerProfile: action.profile,
-        playerProfile: action.profile,
+        playerProfile: isViewingConnectedPlayer ? action.profile : state.playerProfile,
       };
     case "championPoolChanged":
       return {
