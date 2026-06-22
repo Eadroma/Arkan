@@ -59,17 +59,6 @@ export function useAppActions(): {
   );
 
   const detectLeagueClient = useCallback(async () => {
-    dispatch({
-      card: {
-        level: "--",
-        pill: "Scanning",
-        region: state.search.region,
-        status: "Checking",
-        variant: "loading",
-      },
-      type: "leagueClientChanged",
-    });
-
     if (!hasTauriRuntime()) {
       dispatch({
         card: {
