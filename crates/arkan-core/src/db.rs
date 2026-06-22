@@ -15,6 +15,33 @@ pub struct PlayerRecord {
     pub profile_icon_id: Option<u32>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MatchRecord {
+    pub match_id: String,
+    pub regional_route: String,
+    pub game_creation: Option<i64>,
+    pub game_duration: Option<u64>,
+    pub queue_id: Option<u32>,
+    pub game_version: Option<String>,
+    pub raw_json: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlayerMatchRecord {
+    pub puuid: String,
+    pub match_id: String,
+    pub champion_id: u32,
+    pub champion_name: Option<String>,
+    pub team_position: Option<String>,
+    pub win: bool,
+    pub kills: u32,
+    pub deaths: u32,
+    pub assists: u32,
+    pub total_cs: u32,
+    pub gold_earned: u32,
+    pub vision_score: u32,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChampionRoleStats {
     pub champion_id: u32,
@@ -243,6 +270,99 @@ pub fn find_player_by_puuid(
         )
         .optional()
         .map_err(DbError::Sqlite)
+}
+
+pub fn upsert_match(connection: &Connection, record: &MatchRecord) -> Result<(), DbError> {
+    connection.execute(
+        r#"
+        INSERT INTO matches (
+            match_id,
+            regional_route,
+            game_creation,
+            game_duration,
+            queue_id,
+            game_version,
+            raw_json,
+            fetched_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, CURRENT_TIMESTAMP)
+        ON CONFLICT(match_id) DO UPDATE SET
+            regional_route = excluded.regional_route,
+            game_creation = excluded.game_creation,
+            game_duration = excluded.game_duration,
+            queue_id = excluded.queue_id,
+            game_version = excluded.game_version,
+            raw_json = excluded.raw_json,
+            fetched_at = CURRENT_TIMESTAMP
+        "#,
+        params![
+            record.match_id,
+            record.regional_route,
+            record.game_creation,
+            record.game_duration,
+            record.queue_id,
+            record.game_version,
+            record.raw_json
+        ],
+    )?;
+
+    Ok(())
+}
+
+pub fn upsert_player_match(
+    connection: &Connection,
+    record: &PlayerMatchRecord,
+) -> Result<(), DbError> {
+    let id = format!("{}:{}", record.puuid, record.match_id);
+
+    connection.execute(
+        r#"
+        INSERT INTO player_matches (
+            id,
+            puuid,
+            match_id,
+            champion_id,
+            champion_name,
+            team_position,
+            win,
+            kills,
+            deaths,
+            assists,
+            total_cs,
+            gold_earned,
+            vision_score
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+        ON CONFLICT(id) DO UPDATE SET
+            champion_id = excluded.champion_id,
+            champion_name = excluded.champion_name,
+            team_position = excluded.team_position,
+            win = excluded.win,
+            kills = excluded.kills,
+            deaths = excluded.deaths,
+            assists = excluded.assists,
+            total_cs = excluded.total_cs,
+            gold_earned = excluded.gold_earned,
+            vision_score = excluded.vision_score
+        "#,
+        params![
+            id,
+            record.puuid,
+            record.match_id,
+            record.champion_id,
+            record.champion_name,
+            record.team_position,
+            record.win,
+            record.kills,
+            record.deaths,
+            record.assists,
+            record.total_cs,
+            record.gold_earned,
+            record.vision_score
+        ],
+    )?;
+
+    Ok(())
 }
 
 pub fn upsert_champion_role_stats(
@@ -522,6 +642,61 @@ mod tests {
             )
             .unwrap(),
             Some(stats)
+        );
+    }
+
+    #[test]
+    fn upserts_match_and_player_match() {
+        let connection = migrated_connection();
+        let player = PlayerRecord {
+            puuid: "puuid-1".to_owned(),
+            game_name: "Player".to_owned(),
+            tag_line: "EUW".to_owned(),
+            platform_id: "EUW1".to_owned(),
+            summoner_id: None,
+            account_id: None,
+            summoner_level: None,
+            profile_icon_id: None,
+        };
+        let match_record = MatchRecord {
+            match_id: "EUW1_123".to_owned(),
+            regional_route: "europe".to_owned(),
+            game_creation: Some(1_710_000_000_000),
+            game_duration: Some(1_820),
+            queue_id: Some(420),
+            game_version: Some("16.12.1".to_owned()),
+            raw_json: "{\"metadata\":{}}".to_owned(),
+        };
+        let player_match = PlayerMatchRecord {
+            puuid: player.puuid.clone(),
+            match_id: match_record.match_id.clone(),
+            champion_id: 166,
+            champion_name: Some("Akshan".to_owned()),
+            team_position: Some("MIDDLE".to_owned()),
+            win: true,
+            kills: 12,
+            deaths: 4,
+            assists: 8,
+            total_cs: 241,
+            gold_earned: 15_400,
+            vision_score: 22,
+        };
+
+        upsert_player(&connection, &player).unwrap();
+        upsert_match(&connection, &match_record).unwrap();
+        upsert_player_match(&connection, &player_match).unwrap();
+
+        let stored: (String, String, u32, u32, u32) = connection
+            .query_row(
+                "SELECT m.raw_json, pm.champion_name, pm.total_cs, pm.gold_earned, pm.vision_score FROM matches m JOIN player_matches pm ON pm.match_id = m.match_id WHERE m.match_id = ?1",
+                [&match_record.match_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            )
+            .unwrap();
+
+        assert_eq!(
+            stored,
+            (match_record.raw_json, "Akshan".to_owned(), 241, 15_400, 22)
         );
     }
 }

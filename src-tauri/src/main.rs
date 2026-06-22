@@ -205,7 +205,7 @@ async fn match_history(
         .match_ids_by_puuid(platform.regional_route(), &account.puuid, start, count)
         .await
         .map_err(|error| error.to_string())?;
-    let mut entries = Vec::new();
+    let mut fetched_matches = Vec::new();
 
     for match_id in match_ids {
         let detail = client
@@ -214,11 +214,16 @@ async fn match_history(
             .map_err(|error| error.to_string())?;
 
         if let Some(entry) = match_history_entry_from_detail(&detail, &account.puuid) {
-            entries.push(entry);
+            fetched_matches.push((detail, entry));
         }
     }
 
-    Ok(entries)
+    persist_match_history(&account, platform, &fetched_matches)?;
+
+    Ok(fetched_matches
+        .into_iter()
+        .map(|(_, entry)| entry)
+        .collect())
 }
 
 #[derive(Debug, Serialize)]
@@ -486,6 +491,102 @@ fn persist_current_summoner_at(path: &Path, summoner: &CurrentSummoner) -> Resul
     let connection = open_database_at(path)?;
 
     arkan_core::upsert_player(&connection, &player).map_err(|error| error.to_string())
+}
+
+fn persist_match_history(
+    account: &arkan_core::RiotAccount,
+    platform: arkan_core::PlatformRoute,
+    fetched_matches: &[(Value, MatchHistoryEntry)],
+) -> Result<(), String> {
+    let connection = open_app_database()?;
+    let player = arkan_core::PlayerRecord {
+        puuid: account.puuid.clone(),
+        game_name: account.game_name.clone(),
+        tag_line: account.tag_line.clone(),
+        platform_id: platform.to_string(),
+        summoner_id: None,
+        account_id: None,
+        summoner_level: None,
+        profile_icon_id: None,
+    };
+
+    arkan_core::upsert_player(&connection, &player).map_err(|error| error.to_string())?;
+
+    for (detail, entry) in fetched_matches {
+        let match_record = match_record_from_detail(detail, platform.regional_route())?;
+        let player_match = player_match_record_from_detail(detail, &account.puuid, entry)?;
+
+        arkan_core::upsert_match(&connection, &match_record).map_err(|error| error.to_string())?;
+        arkan_core::upsert_player_match(&connection, &player_match)
+            .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
+}
+
+fn match_record_from_detail(
+    detail: &Value,
+    route: arkan_core::RegionalRoute,
+) -> Result<arkan_core::MatchRecord, String> {
+    let metadata = detail
+        .get("metadata")
+        .ok_or_else(|| "match metadata is missing".to_owned())?;
+    let info = detail
+        .get("info")
+        .ok_or_else(|| "match info is missing".to_owned())?;
+    let match_id = metadata
+        .get("matchId")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "match id is missing".to_owned())?;
+
+    Ok(arkan_core::MatchRecord {
+        match_id: match_id.to_owned(),
+        regional_route: route.to_string(),
+        game_creation: info.get("gameCreation").and_then(Value::as_i64),
+        game_duration: info.get("gameDuration").and_then(Value::as_u64),
+        queue_id: info
+            .get("queueId")
+            .and_then(Value::as_u64)
+            .and_then(|value| value.try_into().ok()),
+        game_version: info
+            .get("gameVersion")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        raw_json: serde_json::to_string(detail).map_err(|error| error.to_string())?,
+    })
+}
+
+fn player_match_record_from_detail(
+    detail: &Value,
+    puuid: &str,
+    entry: &MatchHistoryEntry,
+) -> Result<arkan_core::PlayerMatchRecord, String> {
+    let participant = detail
+        .get("info")
+        .and_then(|info| info.get("participants"))
+        .and_then(Value::as_array)
+        .and_then(|participants| {
+            participants
+                .iter()
+                .find(|participant| participant.get("puuid").and_then(Value::as_str) == Some(puuid))
+        })
+        .ok_or_else(|| "player participant is missing".to_owned())?;
+
+    Ok(arkan_core::PlayerMatchRecord {
+        puuid: puuid.to_owned(),
+        match_id: entry.match_id.clone(),
+        champion_id: entry.champion_id,
+        champion_name: Some(entry.champion_name.clone()),
+        team_position: Some(entry.role.clone()),
+        win: entry.win,
+        kills: entry.kills,
+        deaths: entry.deaths,
+        assists: entry.assists,
+        total_cs: value_u32(participant, "totalMinionsKilled")
+            + value_u32(participant, "neutralMinionsKilled"),
+        gold_earned: value_u32(participant, "goldEarned"),
+        vision_score: value_u32(participant, "visionScore"),
+    })
 }
 
 async fn fetch_current_summoner(
@@ -1067,6 +1168,7 @@ mod tests {
             "info": {
                 "gameCreation": 1710000000000_i64,
                 "gameDuration": 1820,
+                "gameVersion": "16.12.1",
                 "queueId": 420,
                 "participants": [
                     {
@@ -1087,6 +1189,10 @@ mod tests {
                         "deaths": 4,
                         "assists": 8,
                         "teamPosition": "BOTTOM",
+                        "totalMinionsKilled": 220,
+                        "neutralMinionsKilled": 21,
+                        "goldEarned": 15400,
+                        "visionScore": 22,
                         "win": true
                     }
                 ]
@@ -1104,6 +1210,17 @@ mod tests {
         assert_eq!(entry.assists, 8);
         assert_eq!(entry.role, "BOTTOM");
         assert!(entry.win);
+
+        let match_record =
+            match_record_from_detail(&detail, arkan_core::RegionalRoute::Europe).unwrap();
+        let player_match =
+            player_match_record_from_detail(&detail, "player-puuid", &entry).unwrap();
+
+        assert_eq!(match_record.game_version.as_deref(), Some("16.12.1"));
+        assert!(match_record.raw_json.contains("EUW1_123"));
+        assert_eq!(player_match.total_cs, 241);
+        assert_eq!(player_match.gold_earned, 15_400);
+        assert_eq!(player_match.vision_score, 22);
     }
 
     #[test]
