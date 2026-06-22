@@ -19,6 +19,7 @@ export type SummonerSpell = {
   image: {
     full: string;
   };
+  key: string;
   name: string;
 };
 
