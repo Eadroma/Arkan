@@ -3,6 +3,7 @@ import { createContext, useContext, useMemo, useReducer, type Dispatch, type Rea
 import type { ChampionDetail, ChampionSummary, ChampionTag } from "../domain/champion";
 import type { ChampionMastery, LeagueClientCard, MatchHistoryEntry, PlayerProfile } from "../domain/league";
 import type { MatchDetail } from "../domain/match";
+import { sameRiotId } from "../domain/riotId";
 
 export type ViewName = "champion-detail" | "champions" | "match-detail" | "profile";
 
@@ -304,12 +305,6 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         view: action.view,
       };
   }
-}
-
-function sameRiotId(first: string, second: string): boolean {
-  const normalize = (value: string): string => value.trim().toLocaleLowerCase("en-US");
-
-  return normalize(first) === normalize(second);
 }
 
 function readStoredSidebarState(): boolean {
