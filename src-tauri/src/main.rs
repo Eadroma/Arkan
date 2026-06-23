@@ -1,6 +1,8 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use serde_json::Value;
@@ -37,7 +39,7 @@ struct RiotAccountResponse {
     champion_masteries: Vec<RiotChampionMasteryResponse>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RiotChampionMasteryResponse {
     champion_id: u32,
@@ -240,7 +242,7 @@ struct LeagueClientStatus {
     error: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CurrentSummoner {
     display_name: String,
@@ -262,6 +264,19 @@ impl CurrentSummoner {
                 .is_some_and(|game_name| !game_name.trim().is_empty())
     }
 }
+
+#[derive(Clone, Debug)]
+struct LcuHydratedSummonerCacheEntry {
+    hydrated_at: Instant,
+    identity_key: String,
+    session_key: String,
+    summoner: CurrentSummoner,
+}
+
+static LCU_HYDRATED_SUMMONER_CACHE: OnceLock<Mutex<Option<LcuHydratedSummonerCacheEntry>>> =
+    OnceLock::new();
+
+const LCU_HYDRATED_SUMMONER_CACHE_TTL: Duration = Duration::from_secs(30);
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -374,7 +389,12 @@ async fn league_client_status() -> LeagueClientStatus {
 
     match summoner_result {
         Ok(mut summoner) => {
-            hydrate_current_summoner_champion_pool(&lockfile, &mut summoner).await;
+            hydrate_current_summoner_champion_pool_with_cache(
+                &lockfile_path,
+                &lockfile,
+                &mut summoner,
+            )
+            .await;
             let cache_result = persist_current_summoner(&summoner);
             let database_path = app_database_path()
                 .ok()
@@ -749,6 +769,98 @@ async fn hydrate_current_summoner_champion_pool(
             champion_points: mastery.champion_points,
         })
         .collect();
+}
+
+async fn hydrate_current_summoner_champion_pool_with_cache(
+    lockfile_path: &Path,
+    lockfile: &arkan_core::LeagueClientLockfile,
+    summoner: &mut CurrentSummoner,
+) {
+    let session_key = lcu_session_key(lockfile_path, lockfile);
+    let Some(identity_key) = current_summoner_identity_key(summoner) else {
+        hydrate_current_summoner_champion_pool(lockfile, summoner).await;
+        return;
+    };
+
+    if let Some(cached_summoner) = cached_hydrated_current_summoner(&session_key, &identity_key) {
+        *summoner = cached_summoner;
+        return;
+    }
+
+    hydrate_current_summoner_champion_pool(lockfile, summoner).await;
+    store_hydrated_current_summoner(&session_key, &identity_key, summoner);
+}
+
+fn cached_hydrated_current_summoner(
+    session_key: &str,
+    identity_key: &str,
+) -> Option<CurrentSummoner> {
+    let cache = LCU_HYDRATED_SUMMONER_CACHE
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .ok()?;
+    let entry = cache.as_ref()?;
+
+    if entry.session_key == session_key
+        && entry.identity_key == identity_key
+        && entry.hydrated_at.elapsed() <= LCU_HYDRATED_SUMMONER_CACHE_TTL
+    {
+        return Some(entry.summoner.clone());
+    }
+
+    None
+}
+
+fn store_hydrated_current_summoner(
+    session_key: &str,
+    identity_key: &str,
+    summoner: &CurrentSummoner,
+) {
+    let Ok(mut cache) = LCU_HYDRATED_SUMMONER_CACHE
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+    else {
+        return;
+    };
+
+    *cache = Some(LcuHydratedSummonerCacheEntry {
+        hydrated_at: Instant::now(),
+        identity_key: identity_key.to_owned(),
+        session_key: session_key.to_owned(),
+        summoner: summoner.clone(),
+    });
+}
+
+fn lcu_session_key(lockfile_path: &Path, lockfile: &arkan_core::LeagueClientLockfile) -> String {
+    format!(
+        "{}:{}:{}",
+        lockfile_path.display(),
+        lockfile.protocol(),
+        lockfile.port()
+    )
+}
+
+fn current_summoner_identity_key(summoner: &CurrentSummoner) -> Option<String> {
+    if let Some(puuid) = summoner.puuid.as_deref().filter(|value| !value.is_empty()) {
+        return Some(format!("puuid:{puuid}"));
+    }
+
+    if let Some(summoner_id) = summoner.summoner_id {
+        return Some(format!("summoner:{summoner_id}"));
+    }
+
+    let game_name = summoner.game_name.as_deref()?.trim();
+    let tag_line = summoner.tag_line.as_deref()?.trim();
+
+    if game_name.is_empty() || tag_line.is_empty() {
+        return None;
+    }
+
+    Some(format!(
+        "riot-id:{}#{}",
+        game_name.to_lowercase(),
+        tag_line.to_lowercase()
+    ))
 }
 
 async fn hydrate_current_summoner_lcu_champion_pool(
@@ -1156,6 +1268,53 @@ mod tests {
                 .map(|mastery| mastery.champion_id)
                 .collect::<Vec<_>>(),
             vec![2, 4, 3, 1, 5]
+        );
+    }
+
+    #[test]
+    fn builds_current_summoner_identity_key_from_stable_identifiers() {
+        let mut summoner = CurrentSummoner {
+            display_name: "Display".to_owned(),
+            game_name: Some("GameName".to_owned()),
+            tag_line: Some("EUW".to_owned()),
+            puuid: Some("puuid-local".to_owned()),
+            summoner_id: Some(123456),
+            profile_icon_id: Some(29),
+            summoner_level: Some(175),
+            champion_masteries: Vec::new(),
+        };
+
+        assert_eq!(
+            current_summoner_identity_key(&summoner).as_deref(),
+            Some("puuid:puuid-local")
+        );
+
+        summoner.puuid = None;
+        assert_eq!(
+            current_summoner_identity_key(&summoner).as_deref(),
+            Some("summoner:123456")
+        );
+
+        summoner.summoner_id = None;
+        assert_eq!(
+            current_summoner_identity_key(&summoner).as_deref(),
+            Some("riot-id:gamename#euw")
+        );
+    }
+
+    #[test]
+    fn lcu_session_key_changes_with_lockfile_port() {
+        let first =
+            arkan_core::LeagueClientLockfile::parse("LeagueClient:1234:50344:password:https")
+                .unwrap();
+        let second =
+            arkan_core::LeagueClientLockfile::parse("LeagueClient:1234:50345:password:https")
+                .unwrap();
+        let lockfile_path = PathBuf::from(r"C:\Riot Games\League of Legends\lockfile");
+
+        assert_ne!(
+            lcu_session_key(&lockfile_path, &first),
+            lcu_session_key(&lockfile_path, &second)
         );
     }
 
