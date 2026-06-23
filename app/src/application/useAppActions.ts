@@ -4,6 +4,7 @@ import { latestDataDragonVersion, loadChampionDetail, loadChampionIndex, profile
 import { hasTauriRuntime, leagueClientStatus, matchDetail, matchHistory, resolveRiotAccount } from "./tauriApi";
 import type { ChampionDetail } from "../domain/champion";
 import type { ChampionMastery, LeagueClientStatus, RiotAccount } from "../domain/league";
+import { hasRiotTag } from "../domain/riotId";
 import { useAppStore, type ViewName } from "../store/appStore";
 
 export function useAppActions(): {
@@ -152,7 +153,7 @@ export function useAppActions(): {
 
   const openPlayerProfile = useCallback(
     async (riotId: string) => {
-      if (!riotId.includes("#")) {
+      if (!hasRiotTag(riotId)) {
         return;
       }
 
@@ -247,7 +248,7 @@ const matchHistoryPageSize = 10;
 function riotIdFromDisplayName(displayName: string): string | undefined {
   const normalized = displayName.trim();
 
-  return normalized.includes("#") ? normalized : undefined;
+  return hasRiotTag(normalized) ? normalized : undefined;
 }
 
 async function applyLeagueClientStatus(

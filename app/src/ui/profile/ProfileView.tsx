@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useAppActions } from "../../application/useAppActions";
 import type { ChampionDetail } from "../../domain/champion";
 import type { ChampionMastery, MatchHistoryEntry } from "../../domain/league";
+import { sameRiotId } from "../../domain/riotId";
 import { useAppStore } from "../../store/appStore";
 import { EmptyLines } from "../components/EmptyLines";
 import { StatusPill } from "../components/StatusPill";
@@ -12,7 +13,7 @@ export function ProfileView(): React.JSX.Element {
   const { state } = useAppStore();
   const { loadChampionCatalog, loadMatchHistoryForDisplayedPlayer, resetToConnectedPlayer } = useAppActions();
   const isViewingConnectedPlayer =
-    state.playerProfile.displayName === state.connectedPlayerProfile.displayName;
+    sameRiotId(state.playerProfile.displayName, state.connectedPlayerProfile.displayName);
 
   useEffect(() => {
     if (state.championPool.length > 0) {
