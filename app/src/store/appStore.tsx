@@ -94,7 +94,7 @@ const defaultPlayerProfile: PlayerProfile = {
   status: "Checking",
 };
 
-const initialState: AppState = {
+export const initialState: AppState = {
   abilityPanel: {},
   championCatalog: [],
   championCatalogFilters: {
@@ -124,7 +124,7 @@ const initialState: AppState = {
     region: "EUW1",
   },
   selectedChampionRole: "ALL",
-  sidebarCollapsed: localStorage.getItem("arkan.sidebar") === "collapsed",
+  sidebarCollapsed: readStoredSidebarState(),
   view: "profile",
 };
 
@@ -152,7 +152,7 @@ export function useAppStore(): AppStoreValue {
   return store;
 }
 
-function appReducer(state: AppState, action: AppAction): AppState {
+export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case "abilityPanelClosed":
       return {
@@ -194,7 +194,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     case "connectedPlayerChanged":
       const isViewingConnectedPlayer =
-        state.playerProfile.displayName === state.connectedPlayerProfile.displayName;
+        sameRiotId(state.playerProfile.displayName, state.connectedPlayerProfile.displayName)
+        || sameRiotId(state.playerProfile.displayName, action.profile.displayName);
 
       return {
         ...state,
@@ -292,7 +293,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         selectedChampionRole: action.role,
       };
     case "sidebarChanged":
-      localStorage.setItem("arkan.sidebar", action.collapsed ? "collapsed" : "expanded");
+      writeStoredSidebarState(action.collapsed);
       return {
         ...state,
         sidebarCollapsed: action.collapsed,
@@ -303,4 +304,26 @@ function appReducer(state: AppState, action: AppAction): AppState {
         view: action.view,
       };
   }
+}
+
+function sameRiotId(first: string, second: string): boolean {
+  const normalize = (value: string): string => value.trim().toLocaleLowerCase("en-US");
+
+  return normalize(first) === normalize(second);
+}
+
+function readStoredSidebarState(): boolean {
+  if (typeof localStorage === "undefined") {
+    return false;
+  }
+
+  return localStorage.getItem("arkan.sidebar") === "collapsed";
+}
+
+function writeStoredSidebarState(collapsed: boolean): void {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+
+  localStorage.setItem("arkan.sidebar", collapsed ? "collapsed" : "expanded");
 }
