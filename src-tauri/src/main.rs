@@ -275,6 +275,7 @@ struct LcuHydratedSummonerCacheEntry {
 
 static LCU_HYDRATED_SUMMONER_CACHE: OnceLock<Mutex<Option<LcuHydratedSummonerCacheEntry>>> =
     OnceLock::new();
+static LCU_PERSISTED_SUMMONER_CACHE: OnceLock<Mutex<Option<String>>> = OnceLock::new();
 
 const LCU_HYDRATED_SUMMONER_CACHE_TTL: Duration = Duration::from_secs(30);
 
@@ -486,6 +487,12 @@ fn persist_current_summoner(summoner: &CurrentSummoner) -> Result<(), String> {
 }
 
 fn persist_current_summoner_at(path: &Path, summoner: &CurrentSummoner) -> Result<(), String> {
+    let persist_key = current_summoner_persist_key(summoner)?;
+
+    if recently_persisted_current_summoner_key(&persist_key) {
+        return Ok(());
+    }
+
     let puuid = summoner
         .puuid
         .clone()
@@ -510,7 +517,9 @@ fn persist_current_summoner_at(path: &Path, summoner: &CurrentSummoner) -> Resul
     };
     let connection = open_database_at(path)?;
 
-    arkan_core::upsert_player(&connection, &player).map_err(|error| error.to_string())
+    arkan_core::upsert_player(&connection, &player).map_err(|error| error.to_string())?;
+    store_persisted_current_summoner_key(&persist_key);
+    Ok(())
 }
 
 fn persist_match_history(
@@ -861,6 +870,56 @@ fn current_summoner_identity_key(summoner: &CurrentSummoner) -> Option<String> {
         game_name.to_lowercase(),
         tag_line.to_lowercase()
     ))
+}
+
+fn current_summoner_persist_key(summoner: &CurrentSummoner) -> Result<String, String> {
+    let puuid = summoner
+        .puuid
+        .as_deref()
+        .ok_or_else(|| "current summoner has no PUUID; cache skipped".to_owned())?;
+    let game_name = summoner
+        .game_name
+        .as_deref()
+        .unwrap_or(&summoner.display_name);
+    let tag_line = summoner.tag_line.as_deref().unwrap_or("LOCAL");
+    let summoner_id = summoner
+        .summoner_id
+        .map(|value| value.to_string())
+        .unwrap_or_default();
+    let summoner_level = summoner
+        .summoner_level
+        .map(|value| value.to_string())
+        .unwrap_or_default();
+    let profile_icon_id = summoner
+        .profile_icon_id
+        .map(|value| value.to_string())
+        .unwrap_or_default();
+
+    Ok(format!(
+        "{puuid}|{game_name}|{tag_line}|EUW1|{summoner_id}|{summoner_level}|{profile_icon_id}"
+    ))
+}
+
+fn recently_persisted_current_summoner_key(persist_key: &str) -> bool {
+    let Ok(cache) = LCU_PERSISTED_SUMMONER_CACHE
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+    else {
+        return false;
+    };
+
+    cache.as_deref() == Some(persist_key)
+}
+
+fn store_persisted_current_summoner_key(persist_key: &str) {
+    let Ok(mut cache) = LCU_PERSISTED_SUMMONER_CACHE
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+    else {
+        return;
+    };
+
+    *cache = Some(persist_key.to_owned());
 }
 
 async fn hydrate_current_summoner_lcu_champion_pool(
@@ -1316,6 +1375,53 @@ mod tests {
             lcu_session_key(&lockfile_path, &first),
             lcu_session_key(&lockfile_path, &second)
         );
+    }
+
+    #[test]
+    fn current_summoner_persist_key_tracks_stored_fields() {
+        let mut summoner = CurrentSummoner {
+            display_name: "Display".to_owned(),
+            game_name: Some("GameName".to_owned()),
+            tag_line: Some("EUW".to_owned()),
+            puuid: Some("puuid-local".to_owned()),
+            summoner_id: Some(123456),
+            profile_icon_id: Some(29),
+            summoner_level: Some(175),
+            champion_masteries: Vec::new(),
+        };
+        let first_key = current_summoner_persist_key(&summoner).unwrap();
+
+        summoner.summoner_level = Some(176);
+        let level_key = current_summoner_persist_key(&summoner).unwrap();
+
+        summoner.summoner_level = Some(175);
+        summoner.profile_icon_id = Some(30);
+        let icon_key = current_summoner_persist_key(&summoner).unwrap();
+
+        assert_ne!(first_key, level_key);
+        assert_ne!(first_key, icon_key);
+    }
+
+    #[test]
+    fn current_summoner_persist_cache_recognizes_identical_snapshot() {
+        let mut summoner = CurrentSummoner {
+            display_name: "Display".to_owned(),
+            game_name: Some("GameName".to_owned()),
+            tag_line: Some("EUW".to_owned()),
+            puuid: Some(format!("puuid-cache-{}", std::process::id())),
+            summoner_id: Some(123456),
+            profile_icon_id: Some(29),
+            summoner_level: Some(175),
+            champion_masteries: Vec::new(),
+        };
+        let first_key = current_summoner_persist_key(&summoner).unwrap();
+
+        store_persisted_current_summoner_key(&first_key);
+        assert!(recently_persisted_current_summoner_key(&first_key));
+
+        summoner.profile_icon_id = Some(30);
+        let changed_key = current_summoner_persist_key(&summoner).unwrap();
+        assert!(!recently_persisted_current_summoner_key(&changed_key));
     }
 
     #[test]
