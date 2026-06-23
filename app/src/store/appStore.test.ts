@@ -46,6 +46,46 @@ describe("appReducer connected player updates", () => {
     expect(nextState.connectedPlayerProfile.displayName).toBe("OtherAccount#EUW");
     expect(nextState.connectedChampionPool).toEqual([{ championId: 67, championLevel: 4, championPoints: 17_456 }]);
   });
+
+  test("does not change state when polling returns the same connected player snapshot", () => {
+    const connectedProfile = playerProfile("Eadroma#999");
+    const connectedPool = [{ championId: 29, championLevel: 5, championPoints: 28_723 }];
+    const state: AppState = {
+      ...initialState,
+      championPool: connectedPool,
+      connectedChampionPool: connectedPool,
+      connectedPlayerProfile: connectedProfile,
+      playerProfile: connectedProfile,
+    };
+
+    const nextState = appReducer(state, {
+      pool: [{ championId: 29, championLevel: 5, championPoints: 28_723 }],
+      profile: playerProfile("Eadroma#999"),
+      type: "connectedPlayerChanged",
+    });
+
+    expect(nextState).toBe(state);
+  });
+
+  test("updates state when the connected player mastery snapshot changes", () => {
+    const connectedProfile = playerProfile("Eadroma#999");
+    const state: AppState = {
+      ...initialState,
+      championPool: [{ championId: 29, championLevel: 5, championPoints: 28_723 }],
+      connectedChampionPool: [{ championId: 29, championLevel: 5, championPoints: 28_723 }],
+      connectedPlayerProfile: connectedProfile,
+      playerProfile: connectedProfile,
+    };
+
+    const nextState = appReducer(state, {
+      pool: [{ championId: 29, championLevel: 6, championPoints: 31_000 }],
+      profile: playerProfile("Eadroma#999"),
+      type: "connectedPlayerChanged",
+    });
+
+    expect(nextState).not.toBe(state);
+    expect(nextState.championPool).toEqual([{ championId: 29, championLevel: 6, championPoints: 31_000 }]);
+  });
 });
 
 function playerProfile(displayName: string): PlayerProfile {
