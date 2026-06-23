@@ -197,20 +197,39 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       const isViewingConnectedPlayer =
         sameRiotId(state.playerProfile.displayName, state.connectedPlayerProfile.displayName)
         || sameRiotId(state.playerProfile.displayName, action.profile.displayName);
+      const nextChampionPool = isViewingConnectedPlayer ? action.pool : state.championPool;
+      const nextPlayerProfile = isViewingConnectedPlayer ? action.profile : state.playerProfile;
+
+      if (
+        championMasteryPoolsEqual(state.championPool, nextChampionPool)
+        && championMasteryPoolsEqual(state.connectedChampionPool, action.pool)
+        && playerProfilesEqual(state.connectedPlayerProfile, action.profile)
+        && playerProfilesEqual(state.playerProfile, nextPlayerProfile)
+      ) {
+        return state;
+      }
 
       return {
         ...state,
-        championPool: isViewingConnectedPlayer ? action.pool : state.championPool,
+        championPool: nextChampionPool,
         connectedChampionPool: action.pool,
         connectedPlayerProfile: action.profile,
-        playerProfile: isViewingConnectedPlayer ? action.profile : state.playerProfile,
+        playerProfile: nextPlayerProfile,
       };
     case "championPoolChanged":
+      if (championMasteryPoolsEqual(state.championPool, action.pool)) {
+        return state;
+      }
+
       return {
         ...state,
         championPool: action.pool,
       };
     case "leagueClientChanged":
+      if (leagueClientCardsEqual(state.leagueClient, action.card)) {
+        return state;
+      }
+
       return {
         ...state,
         leagueClient: action.card,
@@ -305,6 +324,38 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         view: action.view,
       };
   }
+}
+
+function championMasteryPoolsEqual(first: ChampionMastery[], second: ChampionMastery[]): boolean {
+  if (first.length !== second.length) {
+    return false;
+  }
+
+  return first.every((mastery, index) => championMasteriesEqual(mastery, second[index]));
+}
+
+function championMasteriesEqual(first: ChampionMastery, second: ChampionMastery): boolean {
+  return first.championId === second.championId
+    && first.championLevel === second.championLevel
+    && first.championPoints === second.championPoints;
+}
+
+function playerProfilesEqual(first: PlayerProfile, second: PlayerProfile): boolean {
+  return first.displayName === second.displayName
+    && first.iconUrl === second.iconUrl
+    && first.kicker === second.kicker
+    && first.level === second.level
+    && first.region === second.region
+    && first.status === second.status
+    && championMasteryPoolsEqual(first.championMasteries, second.championMasteries);
+}
+
+function leagueClientCardsEqual(first: LeagueClientCard, second: LeagueClientCard): boolean {
+  return first.level === second.level
+    && first.pill === second.pill
+    && first.region === second.region
+    && first.status === second.status
+    && first.variant === second.variant;
 }
 
 function readStoredSidebarState(): boolean {
