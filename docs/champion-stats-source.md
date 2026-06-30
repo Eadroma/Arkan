@@ -45,6 +45,8 @@ Use a two-stage model:
 
 MATCH-V5 does not expose a public endpoint for "last matches by champion". The practical model is seed-based: fetch up to 500 recent matches for selected Riot accounts, cache the raw match payloads, and aggregate every participant in those matches. This gives all champions represented in the sample a shared denominator while staying on official Riot APIs.
 
+The first high-quality seed source should be Riot LEAGUE-V4 top ladders: Challenger, Grandmaster, and Master entries for `RANKED_SOLO_5x5`. Those entries provide encrypted summoner ids, which must be resolved through SUMMONER-V4 before MATCH-V5 can fetch match ids by PUUID. Top-player syncs must stay capped by default because a small development API key cannot safely crawl every top ladder account at full depth.
+
 ### Runtime Lookup Flow
 
 1. Resolve Riot ID to PUUID with ACCOUNT-V1.

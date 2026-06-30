@@ -10,6 +10,14 @@ export type ChampionSampleSyncResult = {
   source: string;
 };
 
+export type TopChampionSampleSyncResult = {
+  fetchedMatches: number;
+  requestedMatchesPerSeed: number;
+  seedsSynced: number;
+  source: string;
+  tier: string;
+};
+
 declare global {
   interface Window {
     __TAURI__?: {
@@ -79,6 +87,26 @@ export async function syncChampionSample(
   }
 
   return invoke<ChampionSampleSyncResult>("sync_champion_sample", { input, platform, requestedMatches });
+}
+
+export async function syncTopChampionSample(
+  platform: string,
+  tier = "challenger",
+  seedCount = 3,
+  requestedMatchesPerSeed = 100,
+): Promise<TopChampionSampleSyncResult | undefined> {
+  const invoke = tauriInvoke();
+
+  if (!invoke) {
+    return undefined;
+  }
+
+  return invoke<TopChampionSampleSyncResult>("sync_top_champion_sample", {
+    platform,
+    requestedMatchesPerSeed,
+    seedCount,
+    tier,
+  });
 }
 
 export async function matchDetail(matchId: string, platform: string): Promise<MatchDetail> {
