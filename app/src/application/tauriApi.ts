@@ -4,6 +4,12 @@ import type { MatchDetail } from "../domain/match";
 
 type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
+export type ChampionSampleSyncResult = {
+  fetchedMatches: number;
+  requestedMatches: number;
+  source: string;
+};
+
 declare global {
   interface Window {
     __TAURI__?: {
@@ -59,6 +65,20 @@ export async function matchHistory(
   }
 
   return invoke<MatchHistoryEntry[]>("match_history", { count, input, platform, start });
+}
+
+export async function syncChampionSample(
+  input: string,
+  platform: string,
+  requestedMatches = 500,
+): Promise<ChampionSampleSyncResult | undefined> {
+  const invoke = tauriInvoke();
+
+  if (!invoke) {
+    return undefined;
+  }
+
+  return invoke<ChampionSampleSyncResult>("sync_champion_sample", { input, platform, requestedMatches });
 }
 
 export async function matchDetail(matchId: string, platform: string): Promise<MatchDetail> {

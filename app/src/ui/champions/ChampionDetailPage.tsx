@@ -41,13 +41,13 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
   const { state } = useAppStore();
   const { setView } = useAppActions();
   const [assets, setAssets] = useState<GameAssets | null>(null);
-  const [localStats, setLocalStats] = useState<ChampionRoleStats[]>([]);
+  const [sampleStats, setSampleStats] = useState<ChampionRoleStats[]>([]);
   const [runePages, setRunePages] = useState<ChampionRunePageStats[]>([]);
   const [spellPairs, setSpellPairs] = useState<ChampionSpellPairStats[]>([]);
   const role = state.selectedChampionRole;
   const abilities = useChampionAbilities(champion);
   const selectedAbility = abilities.find((ability) => ability.key === state.abilityPanel.abilityKey);
-  const selectedStats = selectChampionRoleStats(localStats, role);
+  const selectedStats = selectChampionRoleStats(sampleStats, role);
   const selectedRunePage = runePages[0];
   const selectedSpellPair = spellPairs[0];
 
@@ -56,10 +56,10 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
   }, [champion.version]);
 
   useEffect(() => {
-    setLocalStats([]);
+    setSampleStats([]);
     void loadChampionRoleStats(Number(champion.key), state.playerProfile.region || state.search.region)
-      .then(setLocalStats)
-      .catch(() => setLocalStats([]));
+      .then(setSampleStats)
+      .catch(() => setSampleStats([]));
   }, [champion.key, state.playerProfile.region, state.search.region]);
 
   useEffect(() => {
@@ -405,11 +405,11 @@ function DataSourceModule({ stats }: { stats?: ChampionRoleStats }): React.JSX.E
       </div>
       {stats ? (
         <p>
-          Echantillon local {stats.platformId}, patch {stats.patch}, role {stats.role}, queue {stats.queueId}.
+          Echantillon MATCH-V5 {stats.platformId}, patch {stats.patch}, role {stats.role}, queue {stats.queueId}.
         </p>
       ) : (
         <p>
-          Lance un historique de matchs pour alimenter les aggregats locaux de ce champion.
+          Lance la synchronisation de matchs pour alimenter les aggregats de ce champion.
         </p>
       )}
     </article>

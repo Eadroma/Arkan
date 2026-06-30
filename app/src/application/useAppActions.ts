@@ -1,7 +1,14 @@
 import { useCallback } from "react";
 
 import { latestDataDragonVersion, loadChampionDetail, loadChampionIndex, profileIconUrl } from "./dataDragonApi";
-import { hasTauriRuntime, leagueClientStatus, matchDetail, matchHistory, resolveRiotAccount } from "./tauriApi";
+import {
+  hasTauriRuntime,
+  leagueClientStatus,
+  matchDetail,
+  matchHistory,
+  resolveRiotAccount,
+  syncChampionSample,
+} from "./tauriApi";
 import type { ChampionDetail } from "../domain/champion";
 import type { ChampionMastery, LeagueClientStatus, RiotAccount } from "../domain/league";
 import { hasRiotTag } from "../domain/riotId";
@@ -89,7 +96,9 @@ export function useAppActions(): {
     dispatch({ status: "loading", type: "matchHistoryStatusChanged" });
 
     try {
-      const entries = await matchHistory(riotId, state.playerProfile.region || state.search.region, 0, matchHistoryPageSize);
+      const region = state.playerProfile.region || state.search.region;
+      const entries = await matchHistory(riotId, region, 0, matchHistoryPageSize);
+      syncChampionSampleOnce(riotId, region);
       dispatch({
         entries,
         hasMore: entries.length === matchHistoryPageSize,
@@ -244,6 +253,21 @@ export function useAppActions(): {
 }
 
 const matchHistoryPageSize = 10;
+const championSampleSize = 500;
+const championSampleSyncsStarted = new Set<string>();
+
+function syncChampionSampleOnce(riotId: string, region: string): void {
+  const key = `${region}:${riotId}`;
+
+  if (championSampleSyncsStarted.has(key)) {
+    return;
+  }
+
+  championSampleSyncsStarted.add(key);
+  void syncChampionSample(riotId, region, championSampleSize).catch(() => {
+    championSampleSyncsStarted.delete(key);
+  });
+}
 
 function riotIdFromDisplayName(displayName: string): string | undefined {
   const normalized = displayName.trim();
