@@ -30,6 +30,17 @@ export type ChampionSpellPairStats = {
   wins: number;
 };
 
+export type ChampionRunePageStats = {
+  championId: number;
+  games: number;
+  primaryStyleId: number;
+  selectedPerkIds: number[];
+  source: string;
+  subStyleId: number;
+  winRate: number;
+  wins: number;
+};
+
 export type ChampionSummary = {
   iconUrl: string;
   id: string;

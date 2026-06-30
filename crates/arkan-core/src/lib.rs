@@ -7,8 +7,9 @@ pub mod routing;
 
 pub use config::{AppConfig, ConfigError};
 pub use db::{
-    ChampionRoleStats, ChampionSpellPairStats, DbError, MatchRecord, PlayerMatchRecord,
-    PlayerRecord, find_champion_role_stats, find_champion_role_stats_by_champion,
+    ChampionRoleStats, ChampionRunePageStats, ChampionSpellPairStats, DbError, MatchRecord,
+    PlayerMatchRecord, PlayerRecord, find_champion_role_stats,
+    find_champion_role_stats_by_champion, find_local_champion_rune_pages,
     find_local_champion_spell_pairs, find_player_by_puuid, migrate,
     refresh_local_champion_role_stats, schema_version, upsert_champion_role_stats, upsert_match,
     upsert_player, upsert_player_match,
