@@ -13,8 +13,12 @@ import {
   roleLabel,
   type ChampionDetail,
   type ChampionRoleStats,
+  type ChampionSpellPairStats,
 } from "../../domain/champion";
-import { championRoleStats as loadChampionRoleStats } from "../../application/tauriApi";
+import {
+  championRoleStats as loadChampionRoleStats,
+  championSpellPairs as loadChampionSpellPairs,
+} from "../../application/tauriApi";
 import { useAppActions } from "../../application/useAppActions";
 import { useAppStore } from "../../store/appStore";
 import { Button } from "../components/Button";
@@ -36,10 +40,12 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
   const { setView } = useAppActions();
   const [assets, setAssets] = useState<GameAssets | null>(null);
   const [localStats, setLocalStats] = useState<ChampionRoleStats[]>([]);
+  const [spellPairs, setSpellPairs] = useState<ChampionSpellPairStats[]>([]);
   const role = state.selectedChampionRole;
   const abilities = useChampionAbilities(champion);
   const selectedAbility = abilities.find((ability) => ability.key === state.abilityPanel.abilityKey);
   const selectedStats = selectChampionRoleStats(localStats, role);
+  const selectedSpellPair = spellPairs[0];
 
   useEffect(() => {
     void loadGameAssets(champion.version).then(setAssets);
@@ -51,6 +57,13 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
       .then(setLocalStats)
       .catch(() => setLocalStats([]));
   }, [champion.key, state.playerProfile.region, state.search.region]);
+
+  useEffect(() => {
+    setSpellPairs([]);
+    void loadChampionSpellPairs(Number(champion.key))
+      .then(setSpellPairs)
+      .catch(() => setSpellPairs([]));
+  }, [champion.key]);
 
   return (
     <section className="dashboard champion-build-page">
@@ -69,7 +82,7 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
       <BuildStatStrip stats={selectedStats} />
       <section className="build-layout">
         <RunesModule assets={assets} champion={champion} />
-        <SummonerSpellsModule assets={assets} champion={champion} />
+        <SummonerSpellsModule assets={assets} champion={champion} spellPair={selectedSpellPair} />
         <DataSourceModule stats={selectedStats} />
         <MatchupsModule />
         <SkillPath champion={champion} />
@@ -288,16 +301,28 @@ function RuneTreeColumn({
   );
 }
 
-function SummonerSpellsModule({ assets, champion }: { assets: GameAssets | null; champion: ChampionDetail }): React.JSX.Element {
-  const spells = ["SummonerFlash", "SummonerDot"]
-    .map((id) => assets?.summonerSpells[id])
-    .filter((spell): spell is SummonerSpell => spell !== undefined);
+function SummonerSpellsModule({
+  assets,
+  champion,
+  spellPair,
+}: {
+  assets: GameAssets | null;
+  champion: ChampionDetail;
+  spellPair?: ChampionSpellPairStats;
+}): React.JSX.Element {
+  const spells = spellPair
+    ? spellPair.spellIds
+        .map((spellId) => findSummonerSpellByKey(assets, spellId))
+        .filter((spell): spell is SummonerSpell => spell !== undefined)
+    : ["SummonerFlash", "SummonerDot"]
+        .map((id) => assets?.summonerSpells[id])
+        .filter((spell): spell is SummonerSpell => spell !== undefined);
 
   return (
     <article className="build-module spells-module">
       <div className="module-header">
         <h3>Summoner Spells</h3>
-        <strong>-- WR</strong>
+        <strong>{spellPair ? `${spellPair.winRate.toFixed(1)}% WR` : "-- WR"}</strong>
       </div>
       <div className="spell-pair">
         {spells.map((spell) => (
@@ -311,8 +336,20 @@ function SummonerSpellsModule({ assets, champion }: { assets: GameAssets | null;
           </div>
         ))}
       </div>
+      {spellPair ? (
+        <span className="module-footnote">
+          {spellPair.games} games - {spellPair.wins} wins - {spellPair.source}
+        </span>
+      ) : null}
     </article>
   );
+}
+
+function findSummonerSpellByKey(
+  assets: GameAssets | null,
+  spellId: number,
+): SummonerSpell | undefined {
+  return Object.values(assets?.summonerSpells ?? {}).find((spell) => Number(spell.key) === spellId);
 }
 
 function DataSourceModule({ stats }: { stats?: ChampionRoleStats }): React.JSX.Element {

@@ -1,5 +1,5 @@
 import type { LeagueClientStatus, MatchHistoryEntry, RiotAccount } from "../domain/league";
-import type { ChampionRoleStats } from "../domain/champion";
+import type { ChampionRoleStats, ChampionSpellPairStats } from "../domain/champion";
 import type { MatchDetail } from "../domain/match";
 
 type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
@@ -89,4 +89,14 @@ export async function championRoleStats(championId: number, platform: string): P
   }
 
   return invoke<ChampionRoleStats[]>("champion_role_stats", { championId, platform });
+}
+
+export async function championSpellPairs(championId: number): Promise<ChampionSpellPairStats[]> {
+  const invoke = tauriInvoke();
+
+  if (!invoke) {
+    return [];
+  }
+
+  return invoke<ChampionSpellPairStats[]>("champion_spell_pairs", { championId });
 }
