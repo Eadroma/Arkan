@@ -1,55 +1,152 @@
-# Champion Stats Source
+# Champion Stats Source ADR
+
+Status: accepted
+Last reviewed: 2026-06-30
+Ticket: Explorer la source de donnees champions builds et statistiques
 
 ## Decision
 
-Arkan should build champion statistics from official Riot data instead of scraping U.GG, OP.GG, Porofessor, or similar sites.
+Arkan should build champion statistics from Riot-provided game data and local aggregation. We should not scrape U.GG, OP.GG, Porofessor, Blitz, or other presentation sites as a data source.
 
-The first-party source stack is:
+The source stack is:
 
 - Riot ACCOUNT-V1 and SUMMONER-V4 for player identity and profile metadata.
+- Riot LEAGUE-V4 for rank/tier context when aggregating a player's own matches.
 - Riot MATCH-V5 for match ids, match details, and timelines.
-- Riot Data Dragon for static champion, item, spell, rune, and profile icon metadata.
-- Local SQLite for cached raw matches and derived champion aggregates.
+- Riot Data Dragon for static champion, item, summoner spell, rune, profile icon, and ability assets.
+- CommunityDragon only as a secondary static metadata option when Data Dragon does not expose a needed asset cleanly.
+- Local SQLite for cached raw match payloads and derived champion aggregates.
 
-## Why not scrape third-party sites
+## Product Target
 
-U.GG, OP.GG, Porofessor, and Blitz-like products appear to run their own aggregation pipelines over Riot match data. Their public web pages are presentation surfaces, not stable data contracts for another app. Depending on those pages would make Arkan fragile, harder to test, and harder to keep aligned with Riot policy.
+The champion detail page should feel similar in information density to U.GG: hero header, patch, role, rank filter context, win rate, pick rate, ban rate when available, match count, recommended runes, summoner spells, matchup cards, skill priority, skill path, and item blocks.
 
-## Riot-backed aggregation model
+U.GG publicly presents these data groups on champion build pages, including patch, role, tier, win rate, rank, pick rate, ban rate, matches, runes, summoner spells, matchups, skill priority, skill path, and items. Their app page also advertises build import, skill leveling, live stats, post-game analytics, and LP tracking. These are useful UX references, not API contracts.
 
-The aggregation pipeline should collect match ids by PUUID through MATCH-V5, fetch match details and timelines, then normalize participant data by patch, platform, queue, tier, champion, and role.
+## Why Third-Party Scraping Is Rejected
 
-Champion pages need these derived records:
+Third-party pages are not stable machine contracts. They can change markup, lazy-loaded payloads, naming, filters, anti-abuse controls, or legal boundaries without notice.
 
-- role-level winrate and pickrate;
-- sample size and collection timestamp;
-- recommended skill order from timeline skill-level events;
-- best item build from participant items and timeline purchases;
-- source metadata: patch, platform, queue, tier, and source name.
+Scraping would also make Arkan harder to test and harder to explain to Riot review. Riot's developer terms define game information as data provided through the Riot API and require applications to follow Riot specifications and policy changes. Riot's developer portal also documents rate limits and routing rules; staying on official APIs gives us predictable constraints.
 
-## Initial SQLite shape
+Rejected options:
 
-The local schema now includes:
+- Scrape U.GG/OP.GG/Porofessor pages: fast visual parity, but fragile and poor compliance posture.
+- Reverse engineer private app APIs: likely brittle, legally risky, and not acceptable for a public repo.
+- Ship static copied builds: stale immediately and impossible to personalize by patch/rank/role.
+- Depend only on a user's own history: compliant and useful for personal stats, but too sparse for global champion pages.
 
-- `champion_role_stats`: one aggregate row per champion, role, patch, platform, queue, and tier.
-- `champion_skill_orders`: ranked skill-order candidates for a stats row.
-- `champion_item_builds`: ranked item-build candidates for a stats row.
+## Recommended Architecture
 
-This lets the UI stay honest: winrate and pickrate filters should remain disabled until rows exist from a real MATCH-V5 aggregation job.
+Use a two-stage model:
 
-## Implementation Plan
+1. Local personal stats from the connected or searched player's recent matches.
+2. Expandable aggregate stats from a controlled seed set of accounts or imported match samples.
 
-1. Fetch recent match ids for a seed player or a curated sample of players.
-2. Fetch match details and timelines.
-3. Persist raw match JSON in `matches`.
-4. Normalize `player_matches` for profile history.
-5. Aggregate champion role stats into `champion_role_stats`.
-6. Aggregate skill orders and item builds into their dedicated tables.
-7. Enable champion list winrate/pickrate filters once the aggregate table is populated.
-8. Make champion tiles clickable and load the champion detail page from static Data Dragon data plus local aggregates.
+The app can ship an honest MVP with personal/local aggregates first, then graduate to broader aggregates when we have production API approval, rate-limit budget, and a data job.
 
-## Source References
+### Runtime Lookup Flow
 
-- Riot Developer Portal: League of Legends docs and routing values.
-- Riot Data Dragon: static game data and assets.
-- Riot Developer API Policy: API key security and approved aggregate/stat use cases.
+1. Resolve Riot ID to PUUID with ACCOUNT-V1.
+2. Fetch summoner metadata with SUMMONER-V4.
+3. Fetch rank entries with LEAGUE-V4.
+4. Fetch match ids with MATCH-V5.
+5. Fetch match detail and timeline for each match.
+6. Persist raw match JSON in `matches`.
+7. Normalize participants into `player_matches`.
+8. Aggregate into champion stats tables keyed by patch, platform, queue, tier, champion, and role.
+9. Render champion pages from Data Dragon static metadata plus local aggregate rows.
+
+### Aggregation Dimensions
+
+Required dimensions:
+
+- `patch`: normalize from `info.gameVersion`, preferably major.minor.
+- `platform_id`: `EUW1`, `NA1`, etc.
+- `regional_route`: `europe`, `americas`, `asia`, `sea`.
+- `queue_id`: start with ranked solo/duo `420`.
+- `tier`: start with player's ranked tier, later bucket as `EMERALD_PLUS`, `DIAMOND_PLUS`, etc.
+- `champion_id` and `champion_key`.
+- `role`: TOP, JUNGLE, MIDDLE, BOTTOM, UTILITY.
+
+Required measures:
+
+- games and wins.
+- win rate.
+- pick rate within the aggregation slice.
+- ban rate only when we have a reliable ban denominator. MATCH-V5 includes team bans, but ban rate needs a full slice denominator across matches, not only picked champion rows.
+- skill order candidates from timeline skill-level events.
+- summoner spell pair candidates from participant spell ids.
+- item build candidates from final participant items first, then timeline purchase paths later.
+- matchup stats from lane opponent detection by role/team.
+
+## Current SQLite Fit
+
+The schema already has the foundation:
+
+- `matches`: raw MATCH-V5 payload and game metadata.
+- `player_matches`: normalized participant row for a tracked player.
+- `champion_role_stats`: aggregate row by champion, role, patch, platform, queue, and tier.
+- `champion_skill_orders`: ranked skill-order candidates.
+- `champion_item_builds`: ranked item-build candidates.
+
+Needed additions:
+
+- `champion_spell_pairs` for summoner spell recommendations.
+- `champion_rune_pages` once rune ids are extracted from MATCH-V5 participant perks.
+- `champion_matchups` for lane matchup cards.
+- optional `aggregation_runs` to track source, patch, sample size, freshness, and errors.
+
+## MVP Cut
+
+First implementation should avoid pretending we have U.GG-scale global data.
+
+MVP scope:
+
+- Aggregate only from matches already fetched for the connected/searched player.
+- Label stats as "Local sample" in the UI.
+- Show sample size prominently.
+- Disable or soften global filters when no aggregate rows exist.
+- Keep champion page static sections from Data Dragon visible: abilities, role tags, icons, spell descriptions.
+- Fill skill priority, spell pairs, and items only when sample size is non-zero.
+
+This gives immediate value without violating policy or inventing placeholder numbers.
+
+## Production Path
+
+After MVP:
+
+1. Add a background aggregation command that processes cached matches incrementally.
+2. Add rank/tier enrichment from LEAGUE-V4.
+3. Add a seeded sampling strategy from user-consented searched profiles.
+4. Add freshness rules per patch.
+5. Add a production Riot API application before any broad crawl.
+6. Add dashboards/tests for rate-limit handling and data quality.
+
+## Compliance Rules
+
+- Use only the latest stable Riot API endpoints.
+- Respect platform and regional routing.
+- Treat Riot API keys as secrets; never commit keys.
+- Cache raw data locally to avoid repeated calls.
+- Surface Riot disclaimer in README/app before distribution.
+- Avoid Brawl or any mode Riot marks as unavailable or disallowed for third-party aggregation.
+- Do not imply Riot endorsement.
+
+## Follow-Up Tickets
+
+1. Aggregate local champion role stats from cached MATCH-V5 details.
+2. Add local aggregate read command for champion detail pages.
+3. Add `champion_spell_pairs` and `champion_rune_pages`.
+4. Replace champion page placeholders with local sample cards.
+5. Add `aggregation_runs` freshness metadata.
+6. Add ban-rate support only after validating denominator quality.
+
+## References
+
+- Riot League of Legends docs: https://developer.riotgames.com/docs/lol
+- Riot API list: https://developer.riotgames.com/apis
+- Riot general policy: https://developer.riotgames.com/policies/general
+- Riot API terms: https://developer.riotgames.com/terms
+- U.GG champion page UX reference: https://u.gg/lol/champions/singed/build
+- U.GG app feature reference: https://u.gg/app
