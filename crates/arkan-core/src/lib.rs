@@ -8,8 +8,8 @@ pub mod routing;
 pub use config::{AppConfig, ConfigError};
 pub use db::{
     ChampionRoleStats, DbError, MatchRecord, PlayerMatchRecord, PlayerRecord,
-    find_champion_role_stats, find_player_by_puuid, migrate, schema_version,
-    upsert_champion_role_stats, upsert_match, upsert_player, upsert_player_match,
+    find_champion_role_stats, find_player_by_puuid, migrate, refresh_local_champion_role_stats,
+    schema_version, upsert_champion_role_stats, upsert_match, upsert_player, upsert_player_match,
 };
 pub use lcu::{LeagueClientLockfile, LeagueClientProtocol, ParseLockfileError};
 pub use riot_api::{
