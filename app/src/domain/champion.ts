@@ -21,6 +21,15 @@ export type ChampionRoleStats = {
   wins: number;
 };
 
+export type ChampionSpellPairStats = {
+  championId: number;
+  games: number;
+  source: string;
+  spellIds: [number, number];
+  winRate: number;
+  wins: number;
+};
+
 export type ChampionSummary = {
   iconUrl: string;
   id: string;

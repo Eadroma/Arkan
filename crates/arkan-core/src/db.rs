@@ -61,6 +61,16 @@ pub struct ChampionRoleStats {
     pub source: String,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChampionSpellPairStats {
+    pub champion_id: u32,
+    pub games: u32,
+    pub spell_ids: [u32; 2],
+    pub source: String,
+    pub win_rate: f64,
+    pub wins: u32,
+}
+
 pub fn migrate(connection: &mut Connection) -> Result<(), DbError> {
     let transaction = connection.transaction()?;
 
@@ -634,6 +644,91 @@ pub fn refresh_local_champion_role_stats(
     Ok(stats)
 }
 
+pub fn find_local_champion_spell_pairs(
+    connection: &Connection,
+    champion_id: u32,
+) -> Result<Vec<ChampionSpellPairStats>, DbError> {
+    let matches = list_match_raw_payloads(connection)?;
+    let mut pairs: HashMap<[u32; 2], ChampionSpellPairAggregate> = HashMap::new();
+
+    for raw_json in matches {
+        let Ok(payload) = serde_json::from_str::<Value>(&raw_json) else {
+            continue;
+        };
+        let Some(participants) = payload
+            .get("info")
+            .and_then(|info| info.get("participants"))
+            .and_then(Value::as_array)
+        else {
+            continue;
+        };
+
+        for participant in participants {
+            if participant
+                .get("championId")
+                .and_then(Value::as_u64)
+                .and_then(|value| value.try_into().ok())
+                != Some(champion_id)
+            {
+                continue;
+            }
+
+            let Some(first_spell) = participant
+                .get("summoner1Id")
+                .and_then(Value::as_u64)
+                .and_then(|value| value.try_into().ok())
+            else {
+                continue;
+            };
+            let Some(second_spell) = participant
+                .get("summoner2Id")
+                .and_then(Value::as_u64)
+                .and_then(|value| value.try_into().ok())
+            else {
+                continue;
+            };
+            let mut spell_ids = [first_spell, second_spell];
+            spell_ids.sort();
+            let win = participant
+                .get("win")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let aggregate = pairs.entry(spell_ids).or_default();
+
+            aggregate.games += 1;
+            aggregate.wins += u32::from(win);
+        }
+    }
+
+    let mut stats = pairs
+        .into_iter()
+        .map(|(spell_ids, aggregate)| ChampionSpellPairStats {
+            champion_id,
+            games: aggregate.games,
+            spell_ids,
+            source: "local-match-v5".to_owned(),
+            win_rate: percentage(aggregate.wins, aggregate.games),
+            wins: aggregate.wins,
+        })
+        .collect::<Vec<_>>();
+
+    stats.sort_by(|first, second| {
+        second
+            .games
+            .cmp(&first.games)
+            .then_with(|| second.wins.cmp(&first.wins))
+            .then_with(|| first.spell_ids.cmp(&second.spell_ids))
+    });
+
+    Ok(stats)
+}
+
+#[derive(Default)]
+struct ChampionSpellPairAggregate {
+    games: u32,
+    wins: u32,
+}
+
 fn list_match_raw_payloads(connection: &Connection) -> Result<Vec<String>, DbError> {
     let mut statement = connection.prepare("SELECT raw_json FROM matches")?;
     let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
@@ -960,6 +1055,58 @@ mod tests {
         assert_eq!(annie_rows.len(), 1);
         assert_eq!(annie_rows[0].role, "MIDDLE");
         assert_eq!(annie_rows[0].sample_size, 2);
+    }
+
+    #[test]
+    fn finds_local_champion_spell_pairs_from_cached_matches() {
+        let connection = migrated_connection();
+        let first_match = MatchRecord {
+            match_id: "EUW1_spells_1".to_owned(),
+            regional_route: "europe".to_owned(),
+            game_creation: Some(1_710_000_000_000),
+            game_duration: Some(1_820),
+            queue_id: Some(420),
+            game_version: Some("16.12.1".to_owned()),
+            raw_json: serde_json::json!({
+                "info": {
+                    "participants": [
+                        {"championId": 1, "summoner1Id": 4, "summoner2Id": 14, "win": true},
+                        {"championId": 29, "summoner1Id": 4, "summoner2Id": 7, "win": false}
+                    ]
+                }
+            })
+            .to_string(),
+        };
+        let second_match = MatchRecord {
+            match_id: "EUW1_spells_2".to_owned(),
+            regional_route: "europe".to_owned(),
+            game_creation: Some(1_710_000_100_000),
+            game_duration: Some(1_900),
+            queue_id: Some(420),
+            game_version: Some("16.12.1".to_owned()),
+            raw_json: serde_json::json!({
+                "info": {
+                    "participants": [
+                        {"championId": 1, "summoner1Id": 14, "summoner2Id": 4, "win": false},
+                        {"championId": 1, "summoner1Id": 4, "summoner2Id": 12, "win": true}
+                    ]
+                }
+            })
+            .to_string(),
+        };
+
+        upsert_match(&connection, &first_match).unwrap();
+        upsert_match(&connection, &second_match).unwrap();
+
+        let pairs = find_local_champion_spell_pairs(&connection, 1).unwrap();
+
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs[0].spell_ids, [4, 14]);
+        assert_eq!(pairs[0].games, 2);
+        assert_eq!(pairs[0].wins, 1);
+        assert_eq!(pairs[0].win_rate, 50.0);
+        assert_eq!(pairs[1].spell_ids, [4, 12]);
+        assert_eq!(pairs[1].games, 1);
     }
 
     #[test]

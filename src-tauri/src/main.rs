@@ -67,6 +67,17 @@ struct ChampionRoleStatsResponse {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct ChampionSpellPairStatsResponse {
+    champion_id: u32,
+    games: u32,
+    source: String,
+    spell_ids: [u32; 2],
+    win_rate: f64,
+    wins: u32,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct MatchHistoryEntry {
     assists: u32,
     champion_id: u32,
@@ -491,6 +502,18 @@ fn champion_role_stats(
         .collect())
 }
 
+#[tauri::command]
+fn champion_spell_pairs(champion_id: u32) -> Result<Vec<ChampionSpellPairStatsResponse>, String> {
+    let connection = open_app_database()?;
+    let pairs = arkan_core::find_local_champion_spell_pairs(&connection, champion_id)
+        .map_err(|error| error.to_string())?;
+
+    Ok(pairs
+        .into_iter()
+        .map(ChampionSpellPairStatsResponse::from)
+        .collect())
+}
+
 impl From<arkan_core::ChampionRoleStats> for ChampionRoleStatsResponse {
     fn from(stats: arkan_core::ChampionRoleStats) -> Self {
         Self {
@@ -505,6 +528,19 @@ impl From<arkan_core::ChampionRoleStats> for ChampionRoleStatsResponse {
             sample_size: stats.sample_size,
             source: stats.source,
             tier: stats.tier,
+            win_rate: stats.win_rate,
+            wins: stats.wins,
+        }
+    }
+}
+
+impl From<arkan_core::ChampionSpellPairStats> for ChampionSpellPairStatsResponse {
+    fn from(stats: arkan_core::ChampionSpellPairStats) -> Self {
+        Self {
+            champion_id: stats.champion_id,
+            games: stats.games,
+            source: stats.source,
+            spell_ids: stats.spell_ids,
             win_rate: stats.win_rate,
             wins: stats.wins,
         }
@@ -1284,7 +1320,8 @@ fn main() {
             match_detail,
             league_client_status,
             refresh_champion_role_stats,
-            champion_role_stats
+            champion_role_stats,
+            champion_spell_pairs
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Arkan");
