@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use rusqlite::{Connection, OptionalExtension, params};
+use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlayerRecord {
@@ -463,6 +465,189 @@ pub fn find_champion_role_stats(
         .map_err(DbError::Sqlite)
 }
 
+pub fn refresh_local_champion_role_stats(
+    connection: &Connection,
+    platform_id: &str,
+    tier: Option<&str>,
+) -> Result<Vec<ChampionRoleStats>, DbError> {
+    let matches = list_match_raw_payloads(connection)?;
+    let mut denominators: HashMap<ChampionRoleSliceKey, u32> = HashMap::new();
+    let mut aggregates: HashMap<ChampionRoleAggregateKey, ChampionRoleAggregate> = HashMap::new();
+
+    for raw_json in matches {
+        let Ok(payload) = serde_json::from_str::<Value>(&raw_json) else {
+            continue;
+        };
+        let Some(info) = payload.get("info") else {
+            continue;
+        };
+        let Some(participants) = info.get("participants").and_then(Value::as_array) else {
+            continue;
+        };
+        let Some(queue_id) = info
+            .get("queueId")
+            .and_then(Value::as_u64)
+            .and_then(|value| value.try_into().ok())
+        else {
+            continue;
+        };
+        let patch = info
+            .get("gameVersion")
+            .and_then(Value::as_str)
+            .map(normalize_game_version_to_patch)
+            .unwrap_or_else(|| "unknown".to_owned());
+
+        for participant in participants {
+            let Some(role) = participant
+                .get("teamPosition")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|role| !role.is_empty() && *role != "UNKNOWN")
+            else {
+                continue;
+            };
+            let Some(champion_id) = participant
+                .get("championId")
+                .and_then(Value::as_u64)
+                .and_then(|value| value.try_into().ok())
+            else {
+                continue;
+            };
+            let champion_name = participant
+                .get("championName")
+                .and_then(Value::as_str)
+                .unwrap_or("Unknown")
+                .to_owned();
+            let win = participant
+                .get("win")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let slice_key = ChampionRoleSliceKey {
+                patch: patch.clone(),
+                queue_id,
+                role: role.to_owned(),
+            };
+            let aggregate_key = ChampionRoleAggregateKey {
+                champion_id,
+                patch: patch.clone(),
+                queue_id,
+                role: role.to_owned(),
+            };
+
+            *denominators.entry(slice_key).or_default() += 1;
+            let aggregate =
+                aggregates
+                    .entry(aggregate_key)
+                    .or_insert_with(|| ChampionRoleAggregate {
+                        champion_name,
+                        games: 0,
+                        wins: 0,
+                    });
+
+            aggregate.games += 1;
+            aggregate.wins += u32::from(win);
+        }
+    }
+
+    let mut stats = aggregates
+        .into_iter()
+        .map(|(key, aggregate)| {
+            let denominator = denominators
+                .get(&ChampionRoleSliceKey {
+                    patch: key.patch.clone(),
+                    queue_id: key.queue_id,
+                    role: key.role.clone(),
+                })
+                .copied()
+                .unwrap_or(aggregate.games);
+            ChampionRoleStats {
+                champion_id: key.champion_id,
+                champion_key: key.champion_id.to_string(),
+                champion_name: aggregate.champion_name,
+                role: key.role,
+                patch: key.patch,
+                platform_id: platform_id.to_owned(),
+                queue_id: key.queue_id,
+                tier: tier.map(str::to_owned),
+                sample_size: aggregate.games,
+                wins: aggregate.wins,
+                win_rate: percentage(aggregate.wins, aggregate.games),
+                pick_rate: percentage(aggregate.games, denominator),
+                source: "local-match-v5".to_owned(),
+            }
+        })
+        .collect::<Vec<_>>();
+
+    stats.sort_by(|first, second| {
+        first
+            .patch
+            .cmp(&second.patch)
+            .then_with(|| first.queue_id.cmp(&second.queue_id))
+            .then_with(|| first.role.cmp(&second.role))
+            .then_with(|| first.champion_id.cmp(&second.champion_id))
+    });
+
+    for stat in &stats {
+        upsert_champion_role_stats(connection, stat)?;
+    }
+
+    Ok(stats)
+}
+
+fn list_match_raw_payloads(connection: &Connection) -> Result<Vec<String>, DbError> {
+    let mut statement = connection.prepare("SELECT raw_json FROM matches")?;
+    let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+    let mut payloads = Vec::new();
+
+    for row in rows {
+        payloads.push(row?);
+    }
+
+    Ok(payloads)
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+struct ChampionRoleSliceKey {
+    patch: String,
+    queue_id: u32,
+    role: String,
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+struct ChampionRoleAggregateKey {
+    champion_id: u32,
+    patch: String,
+    queue_id: u32,
+    role: String,
+}
+
+#[derive(Debug)]
+struct ChampionRoleAggregate {
+    champion_name: String,
+    games: u32,
+    wins: u32,
+}
+
+fn normalize_game_version_to_patch(version: &str) -> String {
+    let mut parts = version.split('.');
+    let Some(major) = parts.next().filter(|part| !part.is_empty()) else {
+        return "unknown".to_owned();
+    };
+    let Some(minor) = parts.next().filter(|part| !part.is_empty()) else {
+        return major.to_owned();
+    };
+
+    format!("{major}.{minor}")
+}
+
+fn percentage(numerator: u32, denominator: u32) -> f64 {
+    if denominator == 0 {
+        return 0.0;
+    }
+
+    (f64::from(numerator) / f64::from(denominator)) * 100.0
+}
+
 fn champion_role_stats_id(stats: &ChampionRoleStats) -> String {
     format!(
         "{}:{}:{}:{}:{}:{}",
@@ -643,6 +828,92 @@ mod tests {
             .unwrap(),
             Some(stats)
         );
+    }
+
+    #[test]
+    fn refreshes_local_champion_role_stats_from_cached_matches() {
+        let connection = migrated_connection();
+        let first_match = MatchRecord {
+            match_id: "EUW1_1".to_owned(),
+            regional_route: "europe".to_owned(),
+            game_creation: Some(1_710_000_000_000),
+            game_duration: Some(1_820),
+            queue_id: Some(420),
+            game_version: Some("16.12.1".to_owned()),
+            raw_json: serde_json::json!({
+                "info": {
+                    "gameVersion": "16.12.1",
+                    "queueId": 420,
+                    "participants": [
+                        {"championId": 1, "championName": "Annie", "teamPosition": "MIDDLE", "win": true},
+                        {"championId": 157, "championName": "Yasuo", "teamPosition": "MIDDLE", "win": false},
+                        {"championId": 29, "championName": "Twitch", "teamPosition": "BOTTOM", "win": true},
+                        {"championId": 67, "championName": "Vayne", "teamPosition": "BOTTOM", "win": false}
+                    ]
+                }
+            }).to_string(),
+        };
+        let second_match = MatchRecord {
+            match_id: "EUW1_2".to_owned(),
+            regional_route: "europe".to_owned(),
+            game_creation: Some(1_710_000_100_000),
+            game_duration: Some(1_900),
+            queue_id: Some(420),
+            game_version: Some("16.12.1".to_owned()),
+            raw_json: serde_json::json!({
+                "info": {
+                    "gameVersion": "16.12.1",
+                    "queueId": 420,
+                    "participants": [
+                        {"championId": 1, "championName": "Annie", "teamPosition": "MIDDLE", "win": false},
+                        {"championId": 103, "championName": "Ahri", "teamPosition": "MIDDLE", "win": true},
+                        {"championId": 29, "championName": "Twitch", "teamPosition": "BOTTOM", "win": false},
+                        {"championId": 22, "championName": "Ashe", "teamPosition": "BOTTOM", "win": true}
+                    ]
+                }
+            }).to_string(),
+        };
+
+        upsert_match(&connection, &first_match).unwrap();
+        upsert_match(&connection, &second_match).unwrap();
+
+        let stats = refresh_local_champion_role_stats(&connection, "EUW1", Some("LOCAL")).unwrap();
+
+        assert_eq!(stats.len(), 6);
+        let annie = find_champion_role_stats(
+            &connection,
+            1,
+            "MIDDLE",
+            "16.12",
+            "EUW1",
+            420,
+            Some("LOCAL"),
+        )
+        .unwrap()
+        .expect("Annie middle stats should exist");
+
+        assert_eq!(annie.sample_size, 2);
+        assert_eq!(annie.wins, 1);
+        assert_eq!(annie.win_rate, 50.0);
+        assert_eq!(annie.pick_rate, 50.0);
+        assert_eq!(annie.source, "local-match-v5");
+
+        let twitch = find_champion_role_stats(
+            &connection,
+            29,
+            "BOTTOM",
+            "16.12",
+            "EUW1",
+            420,
+            Some("LOCAL"),
+        )
+        .unwrap()
+        .expect("Twitch bottom stats should exist");
+
+        assert_eq!(twitch.sample_size, 2);
+        assert_eq!(twitch.wins, 1);
+        assert_eq!(twitch.win_rate, 50.0);
+        assert_eq!(twitch.pick_rate, 50.0);
     }
 
     #[test]

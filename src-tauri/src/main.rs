@@ -438,6 +438,19 @@ fn local_database_status() -> Result<String, String> {
     Ok(format!("path={}; schema_version={version}", path.display()))
 }
 
+#[tauri::command]
+fn refresh_champion_role_stats(platform: &str, tier: Option<&str>) -> Result<usize, String> {
+    let connection = open_app_database()?;
+    let platform = platform
+        .parse::<arkan_core::PlatformRoute>()
+        .map_err(|error| error.to_string())?;
+    let stats =
+        arkan_core::refresh_local_champion_role_stats(&connection, &platform.to_string(), tier)
+            .map_err(|error| error.to_string())?;
+
+    Ok(stats.len())
+}
+
 fn find_lockfile_path() -> Option<PathBuf> {
     let configured_path = env::var("ARKAN_LCU_LOCKFILE_PATH")
         .ok()
@@ -549,6 +562,9 @@ fn persist_match_history(
         arkan_core::upsert_player_match(&connection, &player_match)
             .map_err(|error| error.to_string())?;
     }
+
+    arkan_core::refresh_local_champion_role_stats(&connection, &platform.to_string(), None)
+        .map_err(|error| error.to_string())?;
 
     Ok(())
 }
@@ -1206,7 +1222,8 @@ fn main() {
             local_database_status,
             match_history,
             match_detail,
-            league_client_status
+            league_client_status,
+            refresh_champion_role_stats
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Arkan");

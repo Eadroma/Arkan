@@ -69,3 +69,13 @@ export async function matchDetail(matchId: string, platform: string): Promise<Ma
 
   return invoke<MatchDetail>("match_detail", { matchId, platform });
 }
+
+export async function refreshChampionRoleStats(platform: string, tier?: string): Promise<number> {
+  const invoke = tauriInvoke();
+
+  if (!invoke) {
+    return 0;
+  }
+
+  return invoke<number>("refresh_champion_role_stats", { platform, tier });
+}
