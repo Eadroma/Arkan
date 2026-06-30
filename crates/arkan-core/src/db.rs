@@ -635,7 +635,7 @@ pub fn refresh_local_champion_role_stats(
                 wins: aggregate.wins,
                 win_rate: percentage(aggregate.wins, aggregate.games),
                 pick_rate: percentage(aggregate.games, denominator),
-                source: "local-match-v5".to_owned(),
+                source: "sample-match-v5".to_owned(),
             }
         })
         .collect::<Vec<_>>();
@@ -718,7 +718,7 @@ pub fn find_local_champion_spell_pairs(
             champion_id,
             games: aggregate.games,
             spell_ids,
-            source: "local-match-v5".to_owned(),
+            source: "sample-match-v5".to_owned(),
             win_rate: percentage(aggregate.wins, aggregate.games),
             wins: aggregate.wins,
         })
@@ -791,7 +791,7 @@ pub fn find_local_champion_rune_pages(
             games: aggregate.games,
             primary_style_id: page.primary_style_id,
             selected_perk_ids: page.selected_perk_ids,
-            source: "local-match-v5".to_owned(),
+            source: "sample-match-v5".to_owned(),
             sub_style_id: page.sub_style_id,
             win_rate: percentage(aggregate.wins, aggregate.games),
             wins: aggregate.wins,
@@ -1172,7 +1172,7 @@ mod tests {
         assert_eq!(annie.wins, 1);
         assert_eq!(annie.win_rate, 50.0);
         assert_eq!(annie.pick_rate, 50.0);
-        assert_eq!(annie.source, "local-match-v5");
+        assert_eq!(annie.source, "sample-match-v5");
 
         let twitch = find_champion_role_stats(
             &connection,

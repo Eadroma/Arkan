@@ -6,7 +6,7 @@ Ticket: Explorer la source de donnees champions builds et statistiques
 
 ## Decision
 
-Arkan should build champion statistics from Riot-provided game data and local aggregation. We should not scrape U.GG, OP.GG, Porofessor, Blitz, or other presentation sites as a data source.
+Arkan should build champion statistics from Riot-provided game data and sampled MATCH-V5 aggregation. We should not scrape U.GG, OP.GG, Porofessor, Blitz, or other presentation sites as a data source.
 
 The source stack is:
 
@@ -40,10 +40,10 @@ Rejected options:
 
 Use a two-stage model:
 
-1. Local personal stats from the connected or searched player's recent matches.
-2. Expandable aggregate stats from a controlled seed set of accounts or imported match samples.
+1. Fast personal history from the connected or searched player's recent matches.
+2. Champion aggregate stats from a controlled seed set of accounts or imported match samples.
 
-The app can ship an honest MVP with personal/local aggregates first, then graduate to broader aggregates when we have production API approval, rate-limit budget, and a data job.
+MATCH-V5 does not expose a public endpoint for "last matches by champion". The practical model is seed-based: fetch up to 500 recent matches for selected Riot accounts, cache the raw match payloads, and aggregate every participant in those matches. This gives all champions represented in the sample a shared denominator while staying on official Riot APIs.
 
 ### Runtime Lookup Flow
 
@@ -54,8 +54,8 @@ The app can ship an honest MVP with personal/local aggregates first, then gradua
 5. Fetch match detail and timeline for each match.
 6. Persist raw match JSON in `matches`.
 7. Normalize participants into `player_matches`.
-8. Aggregate into champion stats tables keyed by patch, platform, queue, tier, champion, and role.
-9. Render champion pages from Data Dragon static metadata plus local aggregate rows.
+8. Aggregate every participant into champion stats tables keyed by patch, platform, queue, tier, champion, and role.
+9. Render champion pages from Data Dragon static metadata plus sampled aggregate rows.
 
 ### Aggregation Dimensions
 
@@ -86,7 +86,7 @@ The schema already has the foundation:
 
 - `matches`: raw MATCH-V5 payload and game metadata.
 - `player_matches`: normalized participant row for a tracked player.
-- `champion_role_stats`: aggregate row by champion, role, patch, platform, queue, and tier.
+- `champion_role_stats`: aggregate row by champion, role, patch, platform, queue, tier, and sample source.
 - `champion_skill_orders`: ranked skill-order candidates.
 - `champion_item_builds`: ranked item-build candidates.
 
@@ -103,8 +103,8 @@ First implementation should avoid pretending we have U.GG-scale global data.
 
 MVP scope:
 
-- Aggregate only from matches already fetched for the connected/searched player.
-- Label stats as "Local sample" in the UI.
+- Aggregate from cached MATCH-V5 matches seeded by connected/searched accounts.
+- Label stats as "MATCH-V5 sample" in the UI.
 - Show sample size prominently.
 - Disable or soften global filters when no aggregate rows exist.
 - Keep champion page static sections from Data Dragon visible: abilities, role tags, icons, spell descriptions.
@@ -118,7 +118,7 @@ After MVP:
 
 1. Add a background aggregation command that processes cached matches incrementally.
 2. Add rank/tier enrichment from LEAGUE-V4.
-3. Add a seeded sampling strategy from user-consented searched profiles.
+3. Expand the seeded sampling strategy beyond the current displayed profile.
 4. Add freshness rules per patch.
 5. Add a production Riot API application before any broad crawl.
 6. Add dashboards/tests for rate-limit handling and data quality.
@@ -135,10 +135,10 @@ After MVP:
 
 ## Follow-Up Tickets
 
-1. Aggregate local champion role stats from cached MATCH-V5 details.
-2. Add local aggregate read command for champion detail pages.
+1. Aggregate champion role stats from cached MATCH-V5 details.
+2. Add aggregate read command for champion detail pages.
 3. Add `champion_spell_pairs` and `champion_rune_pages`.
-4. Replace champion page placeholders with local sample cards.
+4. Replace champion page placeholders with MATCH-V5 sample cards.
 5. Add `aggregation_runs` freshness metadata.
 6. Add ban-rate support only after validating denominator quality.
 

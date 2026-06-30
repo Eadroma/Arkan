@@ -7,6 +7,9 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 use serde_json::Value;
 
+const CHAMPION_SAMPLE_MATCH_LIMIT: u16 = 500;
+const MATCH_V5_PAGE_SIZE: u8 = 100;
+
 #[tauri::command]
 fn parse_riot_id(input: &str) -> Result<String, String> {
     arkan_core::RiotId::parse(input)
@@ -87,6 +90,14 @@ struct ChampionRunePageStatsResponse {
     sub_style_id: u32,
     win_rate: f64,
     wins: u32,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ChampionSampleSyncResponse {
+    fetched_matches: usize,
+    requested_matches: u16,
+    source: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -240,7 +251,7 @@ async fn match_history(
         .map_err(|error| error.to_string())?;
     let client = arkan_core::RiotApiClient::new(api_key).map_err(|error| error.to_string())?;
     let start = start.unwrap_or(0);
-    let count = count.unwrap_or(10).clamp(1, 20);
+    let count = count.unwrap_or(10).clamp(1, MATCH_V5_PAGE_SIZE);
     let account = client
         .account_by_riot_id(platform.regional_route(), &riot_id)
         .await
@@ -268,6 +279,70 @@ async fn match_history(
         .into_iter()
         .map(|(_, entry)| entry)
         .collect())
+}
+
+#[tauri::command]
+async fn sync_champion_sample(
+    input: &str,
+    platform: &str,
+    requested_matches: Option<u16>,
+) -> Result<ChampionSampleSyncResponse, String> {
+    let config = arkan_core::AppConfig::from_env().map_err(|error| error.to_string())?;
+    let api_key = config
+        .riot_api_key()
+        .ok_or_else(|| "Riot API key is missing".to_owned())?;
+    let riot_id = arkan_core::RiotId::parse(input).map_err(|error| error.to_string())?;
+    let platform = platform
+        .parse::<arkan_core::PlatformRoute>()
+        .map_err(|error| error.to_string())?;
+    let client = arkan_core::RiotApiClient::new(api_key).map_err(|error| error.to_string())?;
+    let requested_matches = requested_matches
+        .unwrap_or(CHAMPION_SAMPLE_MATCH_LIMIT)
+        .clamp(1, CHAMPION_SAMPLE_MATCH_LIMIT);
+    let account = client
+        .account_by_riot_id(platform.regional_route(), &riot_id)
+        .await
+        .map_err(|error| error.to_string())?;
+    let mut fetched_matches = Vec::new();
+    let mut start = 0_u32;
+
+    while fetched_matches.len() < usize::from(requested_matches) {
+        let remaining = usize::from(requested_matches) - fetched_matches.len();
+        let count = remaining.min(usize::from(MATCH_V5_PAGE_SIZE)) as u8;
+        let match_ids = client
+            .match_ids_by_puuid(platform.regional_route(), &account.puuid, start, count)
+            .await
+            .map_err(|error| error.to_string())?;
+
+        if match_ids.is_empty() {
+            break;
+        }
+
+        start += u32::try_from(match_ids.len()).unwrap_or(0);
+
+        for match_id in match_ids {
+            let detail = client
+                .match_by_id(platform.regional_route(), &match_id)
+                .await
+                .map_err(|error| error.to_string())?;
+
+            if let Some(entry) = match_history_entry_from_detail(&detail, &account.puuid) {
+                fetched_matches.push((detail, entry));
+            }
+
+            if fetched_matches.len() >= usize::from(requested_matches) {
+                break;
+            }
+        }
+    }
+
+    persist_match_history(&account, platform, &fetched_matches)?;
+
+    Ok(ChampionSampleSyncResponse {
+        fetched_matches: fetched_matches.len(),
+        requested_matches,
+        source: "sample-match-v5".to_owned(),
+    })
 }
 
 #[derive(Debug, Serialize)]
@@ -1357,6 +1432,7 @@ fn main() {
             resolve_riot_account,
             local_database_status,
             match_history,
+            sync_champion_sample,
             match_detail,
             league_client_status,
             refresh_champion_role_stats,
