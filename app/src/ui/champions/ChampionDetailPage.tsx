@@ -12,7 +12,9 @@ import {
   extractRecommendedBuild,
   roleLabel,
   type ChampionDetail,
+  type ChampionRoleStats,
 } from "../../domain/champion";
+import { championRoleStats as loadChampionRoleStats } from "../../application/tauriApi";
 import { useAppActions } from "../../application/useAppActions";
 import { useAppStore } from "../../store/appStore";
 import { Button } from "../components/Button";
@@ -33,13 +35,22 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
   const { state } = useAppStore();
   const { setView } = useAppActions();
   const [assets, setAssets] = useState<GameAssets | null>(null);
+  const [localStats, setLocalStats] = useState<ChampionRoleStats[]>([]);
   const role = state.selectedChampionRole;
   const abilities = useChampionAbilities(champion);
   const selectedAbility = abilities.find((ability) => ability.key === state.abilityPanel.abilityKey);
+  const selectedStats = selectChampionRoleStats(localStats, role);
 
   useEffect(() => {
     void loadGameAssets(champion.version).then(setAssets);
   }, [champion.version]);
+
+  useEffect(() => {
+    setLocalStats([]);
+    void loadChampionRoleStats(Number(champion.key), state.playerProfile.region || state.search.region)
+      .then(setLocalStats)
+      .catch(() => setLocalStats([]));
+  }, [champion.key, state.playerProfile.region, state.search.region]);
 
   return (
     <section className="dashboard champion-build-page">
@@ -55,11 +66,11 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
         <button type="button">Counters</button>
         <button type="button">Leaderboards</button>
       </nav>
-      <BuildStatStrip />
+      <BuildStatStrip stats={selectedStats} />
       <section className="build-layout">
         <RunesModule assets={assets} champion={champion} />
         <SummonerSpellsModule assets={assets} champion={champion} />
-        <DataSourceModule />
+        <DataSourceModule stats={selectedStats} />
         <MatchupsModule />
         <SkillPath champion={champion} />
         <BestBuild champion={champion} />
@@ -126,6 +137,39 @@ function useChampionAbilities(champion: ChampionDetail): AbilityInfo[] {
   );
 }
 
+function selectChampionRoleStats(
+  stats: ChampionRoleStats[],
+  selectedRole: string,
+): ChampionRoleStats | undefined {
+  const preferredRole = preferredMatchRole(selectedRole);
+
+  return [...stats]
+    .sort((first, second) => second.sampleSize - first.sampleSize)
+    .find((stat) => preferredRole === undefined || stat.role === preferredRole)
+    ?? [...stats].sort((first, second) => second.sampleSize - first.sampleSize)[0];
+}
+
+function preferredMatchRole(selectedRole: string): string | undefined {
+  const roles: Record<string, string> = {
+    Assassin: "MIDDLE",
+    Fighter: "TOP",
+    Mage: "MIDDLE",
+    Marksman: "BOTTOM",
+    Support: "UTILITY",
+    Tank: "TOP",
+  };
+
+  return roles[selectedRole];
+}
+
+function formatPercent(value?: number): string {
+  if (value === undefined) {
+    return "--";
+  }
+
+  return `${value.toFixed(1)}%`;
+}
+
 function AbilityStrip({ abilities }: { abilities: AbilityInfo[] }): React.JSX.Element {
   const { dispatch, state } = useAppStore();
 
@@ -171,16 +215,16 @@ function AbilityPanel({
   );
 }
 
-function BuildStatStrip(): React.JSX.Element {
+function BuildStatStrip({ stats }: { stats?: ChampionRoleStats }): React.JSX.Element {
   return (
     <section className="build-stat-strip">
       {[
-        ["Tier", "A"],
-        ["Win Rate", "--"],
-        ["Rank", "-- / --"],
-        ["Pick Rate", "--"],
+        ["Tier", stats?.tier ?? "Local"],
+        ["Win Rate", formatPercent(stats?.winRate)],
+        ["Rank", stats ? `${stats.wins} / ${stats.sampleSize}` : "-- / --"],
+        ["Pick Rate", formatPercent(stats?.pickRate)],
         ["Ban Rate", "--"],
-        ["Matches", "0"],
+        ["Matches", stats?.sampleSize.toString() ?? "0"],
       ].map(([label, value]) => (
         <article key={label}>
           <span>{label}</span>
@@ -271,16 +315,22 @@ function SummonerSpellsModule({ assets, champion }: { assets: GameAssets | null;
   );
 }
 
-function DataSourceModule(): React.JSX.Element {
+function DataSourceModule({ stats }: { stats?: ChampionRoleStats }): React.JSX.Element {
   return (
     <article className="build-module data-source-module">
       <div className="module-header">
         <h3>Stats source</h3>
-        <strong>MATCH-V5</strong>
+        <strong>{stats?.source ?? "MATCH-V5"}</strong>
       </div>
-      <p>
-        Les builds publics seront branches depuis des aggregats de matchs par champion, role, rang et patch.
-      </p>
+      {stats ? (
+        <p>
+          Echantillon local {stats.platformId}, patch {stats.patch}, role {stats.role}, queue {stats.queueId}.
+        </p>
+      ) : (
+        <p>
+          Lance un historique de matchs pour alimenter les aggregats locaux de ce champion.
+        </p>
+      )}
     </article>
   );
 }

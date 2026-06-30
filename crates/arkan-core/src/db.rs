@@ -465,6 +465,46 @@ pub fn find_champion_role_stats(
         .map_err(DbError::Sqlite)
 }
 
+pub fn find_champion_role_stats_by_champion(
+    connection: &Connection,
+    champion_id: u32,
+    platform_id: &str,
+) -> Result<Vec<ChampionRoleStats>, DbError> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT
+            champion_id,
+            champion_key,
+            champion_name,
+            role,
+            patch,
+            platform_id,
+            queue_id,
+            tier,
+            sample_size,
+            wins,
+            win_rate,
+            pick_rate,
+            source
+        FROM champion_role_stats
+        WHERE champion_id = ?1
+            AND platform_id = ?2
+        ORDER BY sample_size DESC, collected_at DESC
+        "#,
+    )?;
+    let rows = statement.query_map(
+        params![champion_id, platform_id],
+        champion_role_stats_from_row,
+    )?;
+    let mut stats = Vec::new();
+
+    for row in rows {
+        stats.push(row?);
+    }
+
+    Ok(stats)
+}
+
 pub fn refresh_local_champion_role_stats(
     connection: &Connection,
     platform_id: &str,
@@ -914,6 +954,12 @@ mod tests {
         assert_eq!(twitch.wins, 1);
         assert_eq!(twitch.win_rate, 50.0);
         assert_eq!(twitch.pick_rate, 50.0);
+
+        let annie_rows = find_champion_role_stats_by_champion(&connection, 1, "EUW1").unwrap();
+
+        assert_eq!(annie_rows.len(), 1);
+        assert_eq!(annie_rows[0].role, "MIDDLE");
+        assert_eq!(annie_rows[0].sample_size, 2);
     }
 
     #[test]
