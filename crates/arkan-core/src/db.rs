@@ -71,6 +71,18 @@ pub struct ChampionSpellPairStats {
     pub wins: u32,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChampionRunePageStats {
+    pub champion_id: u32,
+    pub games: u32,
+    pub primary_style_id: u32,
+    pub selected_perk_ids: Vec<u32>,
+    pub source: String,
+    pub sub_style_id: u32,
+    pub win_rate: f64,
+    pub wins: u32,
+}
+
 pub fn migrate(connection: &mut Connection) -> Result<(), DbError> {
     let transaction = connection.transaction()?;
 
@@ -729,6 +741,135 @@ struct ChampionSpellPairAggregate {
     wins: u32,
 }
 
+pub fn find_local_champion_rune_pages(
+    connection: &Connection,
+    champion_id: u32,
+) -> Result<Vec<ChampionRunePageStats>, DbError> {
+    let matches = list_match_raw_payloads(connection)?;
+    let mut pages: HashMap<ChampionRunePageKey, ChampionRunePageAggregate> = HashMap::new();
+
+    for raw_json in matches {
+        let Ok(payload) = serde_json::from_str::<Value>(&raw_json) else {
+            continue;
+        };
+        let Some(participants) = payload
+            .get("info")
+            .and_then(|info| info.get("participants"))
+            .and_then(Value::as_array)
+        else {
+            continue;
+        };
+
+        for participant in participants {
+            if participant
+                .get("championId")
+                .and_then(Value::as_u64)
+                .and_then(|value| value.try_into().ok())
+                != Some(champion_id)
+            {
+                continue;
+            }
+
+            let Some(rune_page) = participant_rune_page(participant) else {
+                continue;
+            };
+            let win = participant
+                .get("win")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let aggregate = pages.entry(rune_page).or_default();
+
+            aggregate.games += 1;
+            aggregate.wins += u32::from(win);
+        }
+    }
+
+    let mut stats = pages
+        .into_iter()
+        .map(|(page, aggregate)| ChampionRunePageStats {
+            champion_id,
+            games: aggregate.games,
+            primary_style_id: page.primary_style_id,
+            selected_perk_ids: page.selected_perk_ids,
+            source: "local-match-v5".to_owned(),
+            sub_style_id: page.sub_style_id,
+            win_rate: percentage(aggregate.wins, aggregate.games),
+            wins: aggregate.wins,
+        })
+        .collect::<Vec<_>>();
+
+    stats.sort_by(|first, second| {
+        second
+            .games
+            .cmp(&first.games)
+            .then_with(|| second.wins.cmp(&first.wins))
+            .then_with(|| first.primary_style_id.cmp(&second.primary_style_id))
+            .then_with(|| first.sub_style_id.cmp(&second.sub_style_id))
+            .then_with(|| first.selected_perk_ids.cmp(&second.selected_perk_ids))
+    });
+
+    Ok(stats)
+}
+
+#[derive(Debug, Clone, Default, Eq, Hash, PartialEq)]
+struct ChampionRunePageKey {
+    primary_style_id: u32,
+    selected_perk_ids: Vec<u32>,
+    sub_style_id: u32,
+}
+
+#[derive(Default)]
+struct ChampionRunePageAggregate {
+    games: u32,
+    wins: u32,
+}
+
+fn participant_rune_page(participant: &Value) -> Option<ChampionRunePageKey> {
+    let styles = participant.get("perks")?.get("styles")?.as_array()?;
+    let primary_style = styles
+        .iter()
+        .find(|style| style.get("description").and_then(Value::as_str) == Some("primaryStyle"))
+        .or_else(|| styles.first())?;
+    let sub_style = styles
+        .iter()
+        .find(|style| style.get("description").and_then(Value::as_str) == Some("subStyle"))
+        .or_else(|| styles.get(1))?;
+    let primary_style_id = primary_style
+        .get("style")
+        .and_then(Value::as_u64)
+        .and_then(|value| value.try_into().ok())?;
+    let sub_style_id = sub_style
+        .get("style")
+        .and_then(Value::as_u64)
+        .and_then(|value| value.try_into().ok())?;
+    let selected_perk_ids = styles
+        .iter()
+        .flat_map(|style| {
+            style
+                .get("selections")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+        })
+        .filter_map(|selection| {
+            selection
+                .get("perk")
+                .and_then(Value::as_u64)
+                .and_then(|value| value.try_into().ok())
+        })
+        .collect::<Vec<_>>();
+
+    if selected_perk_ids.is_empty() {
+        return None;
+    }
+
+    Some(ChampionRunePageKey {
+        primary_style_id,
+        selected_perk_ids,
+        sub_style_id,
+    })
+}
+
 fn list_match_raw_payloads(connection: &Connection) -> Result<Vec<String>, DbError> {
     let mut statement = connection.prepare("SELECT raw_json FROM matches")?;
     let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
@@ -1107,6 +1248,134 @@ mod tests {
         assert_eq!(pairs[0].win_rate, 50.0);
         assert_eq!(pairs[1].spell_ids, [4, 12]);
         assert_eq!(pairs[1].games, 1);
+    }
+
+    #[test]
+    fn finds_local_champion_rune_pages_from_cached_matches() {
+        let connection = migrated_connection();
+        let first_match = MatchRecord {
+            match_id: "EUW1_runes_1".to_owned(),
+            regional_route: "europe".to_owned(),
+            game_creation: Some(1_710_000_000_000),
+            game_duration: Some(1_820),
+            queue_id: Some(420),
+            game_version: Some("16.12.1".to_owned()),
+            raw_json: serde_json::json!({
+                "info": {
+                    "participants": [
+                        {
+                            "championId": 1,
+                            "win": true,
+                            "perks": {
+                                "styles": [
+                                    {
+                                        "description": "primaryStyle",
+                                        "style": 8100,
+                                        "selections": [
+                                            {"perk": 8112},
+                                            {"perk": 8126},
+                                            {"perk": 8138},
+                                            {"perk": 8135}
+                                        ]
+                                    },
+                                    {
+                                        "description": "subStyle",
+                                        "style": 8200,
+                                        "selections": [
+                                            {"perk": 8210},
+                                            {"perk": 8237}
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            })
+            .to_string(),
+        };
+        let second_match = MatchRecord {
+            match_id: "EUW1_runes_2".to_owned(),
+            regional_route: "europe".to_owned(),
+            game_creation: Some(1_710_000_100_000),
+            game_duration: Some(1_900),
+            queue_id: Some(420),
+            game_version: Some("16.12.1".to_owned()),
+            raw_json: serde_json::json!({
+                "info": {
+                    "participants": [
+                        {
+                            "championId": 1,
+                            "win": false,
+                            "perks": {
+                                "styles": [
+                                    {
+                                        "description": "primaryStyle",
+                                        "style": 8100,
+                                        "selections": [
+                                            {"perk": 8112},
+                                            {"perk": 8126},
+                                            {"perk": 8138},
+                                            {"perk": 8135}
+                                        ]
+                                    },
+                                    {
+                                        "description": "subStyle",
+                                        "style": 8200,
+                                        "selections": [
+                                            {"perk": 8210},
+                                            {"perk": 8237}
+                                        ]
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "championId": 1,
+                            "win": true,
+                            "perks": {
+                                "styles": [
+                                    {
+                                        "description": "primaryStyle",
+                                        "style": 8000,
+                                        "selections": [
+                                            {"perk": 8005},
+                                            {"perk": 9111}
+                                        ]
+                                    },
+                                    {
+                                        "description": "subStyle",
+                                        "style": 8400,
+                                        "selections": [
+                                            {"perk": 8444}
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            })
+            .to_string(),
+        };
+
+        upsert_match(&connection, &first_match).unwrap();
+        upsert_match(&connection, &second_match).unwrap();
+
+        let pages = find_local_champion_rune_pages(&connection, 1).unwrap();
+
+        assert_eq!(pages.len(), 2);
+        assert_eq!(pages[0].primary_style_id, 8100);
+        assert_eq!(pages[0].sub_style_id, 8200);
+        assert_eq!(
+            pages[0].selected_perk_ids,
+            vec![8112, 8126, 8138, 8135, 8210, 8237]
+        );
+        assert_eq!(pages[0].games, 2);
+        assert_eq!(pages[0].wins, 1);
+        assert_eq!(pages[0].win_rate, 50.0);
+        assert_eq!(pages[1].primary_style_id, 8000);
+        assert_eq!(pages[1].games, 1);
     }
 
     #[test]

@@ -78,6 +78,19 @@ struct ChampionSpellPairStatsResponse {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct ChampionRunePageStatsResponse {
+    champion_id: u32,
+    games: u32,
+    primary_style_id: u32,
+    selected_perk_ids: Vec<u32>,
+    source: String,
+    sub_style_id: u32,
+    win_rate: f64,
+    wins: u32,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct MatchHistoryEntry {
     assists: u32,
     champion_id: u32,
@@ -514,6 +527,18 @@ fn champion_spell_pairs(champion_id: u32) -> Result<Vec<ChampionSpellPairStatsRe
         .collect())
 }
 
+#[tauri::command]
+fn champion_rune_pages(champion_id: u32) -> Result<Vec<ChampionRunePageStatsResponse>, String> {
+    let connection = open_app_database()?;
+    let pages = arkan_core::find_local_champion_rune_pages(&connection, champion_id)
+        .map_err(|error| error.to_string())?;
+
+    Ok(pages
+        .into_iter()
+        .map(ChampionRunePageStatsResponse::from)
+        .collect())
+}
+
 impl From<arkan_core::ChampionRoleStats> for ChampionRoleStatsResponse {
     fn from(stats: arkan_core::ChampionRoleStats) -> Self {
         Self {
@@ -541,6 +566,21 @@ impl From<arkan_core::ChampionSpellPairStats> for ChampionSpellPairStatsResponse
             games: stats.games,
             source: stats.source,
             spell_ids: stats.spell_ids,
+            win_rate: stats.win_rate,
+            wins: stats.wins,
+        }
+    }
+}
+
+impl From<arkan_core::ChampionRunePageStats> for ChampionRunePageStatsResponse {
+    fn from(stats: arkan_core::ChampionRunePageStats) -> Self {
+        Self {
+            champion_id: stats.champion_id,
+            games: stats.games,
+            primary_style_id: stats.primary_style_id,
+            selected_perk_ids: stats.selected_perk_ids,
+            source: stats.source,
+            sub_style_id: stats.sub_style_id,
             win_rate: stats.win_rate,
             wins: stats.wins,
         }
@@ -1321,7 +1361,8 @@ fn main() {
             league_client_status,
             refresh_champion_role_stats,
             champion_role_stats,
-            champion_spell_pairs
+            champion_spell_pairs,
+            champion_rune_pages
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Arkan");

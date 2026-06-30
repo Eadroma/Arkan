@@ -12,10 +12,12 @@ import {
   extractRecommendedBuild,
   roleLabel,
   type ChampionDetail,
+  type ChampionRunePageStats,
   type ChampionRoleStats,
   type ChampionSpellPairStats,
 } from "../../domain/champion";
 import {
+  championRunePages as loadChampionRunePages,
   championRoleStats as loadChampionRoleStats,
   championSpellPairs as loadChampionSpellPairs,
 } from "../../application/tauriApi";
@@ -40,11 +42,13 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
   const { setView } = useAppActions();
   const [assets, setAssets] = useState<GameAssets | null>(null);
   const [localStats, setLocalStats] = useState<ChampionRoleStats[]>([]);
+  const [runePages, setRunePages] = useState<ChampionRunePageStats[]>([]);
   const [spellPairs, setSpellPairs] = useState<ChampionSpellPairStats[]>([]);
   const role = state.selectedChampionRole;
   const abilities = useChampionAbilities(champion);
   const selectedAbility = abilities.find((ability) => ability.key === state.abilityPanel.abilityKey);
   const selectedStats = selectChampionRoleStats(localStats, role);
+  const selectedRunePage = runePages[0];
   const selectedSpellPair = spellPairs[0];
 
   useEffect(() => {
@@ -65,6 +69,13 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
       .catch(() => setSpellPairs([]));
   }, [champion.key]);
 
+  useEffect(() => {
+    setRunePages([]);
+    void loadChampionRunePages(Number(champion.key))
+      .then(setRunePages)
+      .catch(() => setRunePages([]));
+  }, [champion.key]);
+
   return (
     <section className="dashboard champion-build-page">
       <ChampionHero
@@ -81,7 +92,7 @@ export function ChampionDetailPage({ champion }: { champion: ChampionDetail }): 
       </nav>
       <BuildStatStrip stats={selectedStats} />
       <section className="build-layout">
-        <RunesModule assets={assets} champion={champion} />
+        <RunesModule assets={assets} champion={champion} runePage={selectedRunePage} />
         <SummonerSpellsModule assets={assets} champion={champion} spellPair={selectedSpellPair} />
         <DataSourceModule stats={selectedStats} />
         <MatchupsModule />
@@ -248,32 +259,65 @@ function BuildStatStrip({ stats }: { stats?: ChampionRoleStats }): React.JSX.Ele
   );
 }
 
-function RunesModule({ assets, champion }: { assets: GameAssets | null; champion: ChampionDetail }): React.JSX.Element {
-  const primary = assets?.runeTrees.find((tree) => tree.name === "Domination") ?? assets?.runeTrees[0];
+function RunesModule({
+  assets,
+  champion,
+  runePage,
+}: {
+  assets: GameAssets | null;
+  champion: ChampionDetail;
+  runePage?: ChampionRunePageStats;
+}): React.JSX.Element {
+  const primary =
+    findRuneTreeById(assets, runePage?.primaryStyleId) ??
+    assets?.runeTrees.find((tree) => tree.name === "Domination") ??
+    assets?.runeTrees[0];
   const secondary =
+    findRuneTreeById(assets, runePage?.subStyleId) ??
     assets?.runeTrees.find((tree) => tree.name === "Sorcellerie" || tree.name === "Sorcery") ??
     assets?.runeTrees[1];
+  const activeRuneIds = runePage ? new Set(runePage.selectedPerkIds) : undefined;
 
   return (
     <article className="build-module runes-module">
       <div className="module-header">
         <h3>Recommended</h3>
-        <strong>Runes</strong>
+        <strong>{runePage ? `${runePage.winRate.toFixed(1)}% WR` : "Runes"}</strong>
       </div>
       <div className="rune-board">
-        {primary ? <RuneTreeColumn activeRunes={[0, 4, 8, 9]} tree={primary} /> : <span>Runes a synchroniser</span>}
-        {secondary ? <RuneTreeColumn activeRunes={[1, 5, 8]} compact tree={secondary} /> : null}
+        {primary ? (
+          <RuneTreeColumn activeRuneIds={activeRuneIds} activeRunes={[0, 4, 8, 9]} tree={primary} />
+        ) : (
+          <span>Runes a synchroniser</span>
+        )}
+        {secondary ? (
+          <RuneTreeColumn activeRuneIds={activeRuneIds} activeRunes={[1, 5, 8]} compact tree={secondary} />
+        ) : null}
       </div>
-      <span className="module-footnote">{champion.name} build placeholder until MATCH-V5 aggregates are synced.</span>
+      <span className="module-footnote">
+        {runePage
+          ? `${runePage.games} games - ${runePage.wins} wins - ${runePage.source}`
+          : `${champion.name} build placeholder until MATCH-V5 aggregates are synced.`}
+      </span>
     </article>
   );
 }
 
+function findRuneTreeById(assets: GameAssets | null, treeId?: number): RuneTree | undefined {
+  if (treeId === undefined) {
+    return undefined;
+  }
+
+  return assets?.runeTrees.find((tree) => tree.id === treeId);
+}
+
 function RuneTreeColumn({
+  activeRuneIds,
   activeRunes,
   compact = false,
   tree,
 }: {
+  activeRuneIds?: Set<number>;
   activeRunes: number[];
   compact?: boolean;
   tree: RuneTree;
@@ -290,7 +334,7 @@ function RuneTreeColumn({
         {runes.map((rune, index) => (
           <img
             alt={rune.name}
-            data-active={activeRunes.includes(index)}
+            data-active={activeRuneIds?.has(rune.id) ?? activeRunes.includes(index)}
             key={rune.id}
             src={runeIconUrl(rune.icon)}
             title={rune.name}
