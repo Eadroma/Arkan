@@ -102,6 +102,16 @@ struct ChampionSampleSyncResponse {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct TopChampionSampleSyncResponse {
+    fetched_matches: usize,
+    requested_matches_per_seed: u16,
+    seeds_synced: usize,
+    source: String,
+    tier: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct MatchHistoryEntry {
     assists: u32,
     champion_id: u32,
@@ -303,6 +313,90 @@ async fn sync_champion_sample(
         .account_by_riot_id(platform.regional_route(), &riot_id)
         .await
         .map_err(|error| error.to_string())?;
+    let fetched_matches =
+        fetch_sample_matches_for_puuid(&client, platform, &account.puuid, requested_matches)
+            .await?;
+
+    persist_match_history(&account, platform, &fetched_matches)?;
+
+    Ok(ChampionSampleSyncResponse {
+        fetched_matches: fetched_matches.len(),
+        requested_matches,
+        source: "sample-match-v5".to_owned(),
+    })
+}
+
+#[tauri::command]
+async fn sync_top_champion_sample(
+    platform: &str,
+    tier: Option<&str>,
+    seed_count: Option<u8>,
+    requested_matches_per_seed: Option<u16>,
+) -> Result<TopChampionSampleSyncResponse, String> {
+    let config = arkan_core::AppConfig::from_env().map_err(|error| error.to_string())?;
+    let api_key = config
+        .riot_api_key()
+        .ok_or_else(|| "Riot API key is missing".to_owned())?;
+    let platform = platform
+        .parse::<arkan_core::PlatformRoute>()
+        .map_err(|error| error.to_string())?;
+    let tier = parse_top_league_tier(tier.unwrap_or("challenger"))?;
+    let seed_count = seed_count.unwrap_or(3).clamp(1, 10);
+    let requested_matches_per_seed = requested_matches_per_seed.unwrap_or(100).clamp(1, 500);
+    let client = arkan_core::RiotApiClient::new(api_key).map_err(|error| error.to_string())?;
+    let mut entries = client
+        .top_league_entries(platform, tier, "RANKED_SOLO_5x5")
+        .await
+        .map_err(|error| error.to_string())?;
+
+    entries.sort_by(|first, second| {
+        second
+            .league_points
+            .cmp(&first.league_points)
+            .then_with(|| second.wins.cmp(&first.wins))
+    });
+
+    let mut fetched_match_count = 0_usize;
+    let mut seeds_synced = 0_usize;
+
+    for entry in entries.into_iter().take(usize::from(seed_count)) {
+        let summoner = client
+            .summoner_by_id(platform, &entry.summoner_id)
+            .await
+            .map_err(|error| error.to_string())?;
+        let fetched_matches = fetch_sample_matches_for_puuid(
+            &client,
+            platform,
+            &summoner.puuid,
+            requested_matches_per_seed,
+        )
+        .await?;
+
+        fetched_match_count += fetched_matches.len();
+        seeds_synced += 1;
+        persist_seed_match_history(
+            &summoner,
+            platform,
+            top_league_tier_label(tier),
+            &fetched_matches,
+        )?;
+    }
+
+    Ok(TopChampionSampleSyncResponse {
+        fetched_matches: fetched_match_count,
+        requested_matches_per_seed,
+        seeds_synced,
+        source: "top-player-sample-match-v5".to_owned(),
+        tier: top_league_tier_label(tier).to_owned(),
+    })
+}
+
+async fn fetch_sample_matches_for_puuid(
+    client: &arkan_core::RiotApiClient,
+    platform: arkan_core::PlatformRoute,
+    puuid: &str,
+    requested_matches: u16,
+) -> Result<Vec<(Value, MatchHistoryEntry)>, String> {
     let mut fetched_matches = Vec::new();
     let mut start = 0_u32;
 
@@ -310,7 +404,7 @@ async fn sync_champion_sample(
         let remaining = usize::from(requested_matches) - fetched_matches.len();
         let count = remaining.min(usize::from(MATCH_V5_PAGE_SIZE)) as u8;
         let match_ids = client
-            .match_ids_by_puuid(platform.regional_route(), &account.puuid, start, count)
+            .match_ids_by_puuid(platform.regional_route(), puuid, start, count)
             .await
             .map_err(|error| error.to_string())?;
 
@@ -326,7 +420,7 @@ async fn sync_champion_sample(
                 .await
                 .map_err(|error| error.to_string())?;
 
-            if let Some(entry) = match_history_entry_from_detail(&detail, &account.puuid) {
+            if let Some(entry) = match_history_entry_from_detail(&detail, puuid) {
                 fetched_matches.push((detail, entry));
             }
 
@@ -336,13 +430,24 @@ async fn sync_champion_sample(
         }
     }
 
-    persist_match_history(&account, platform, &fetched_matches)?;
+    Ok(fetched_matches)
+}
 
-    Ok(ChampionSampleSyncResponse {
-        fetched_matches: fetched_matches.len(),
-        requested_matches,
-        source: "sample-match-v5".to_owned(),
-    })
+fn parse_top_league_tier(value: &str) -> Result<arkan_core::RiotTopLeagueTier, String> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "challenger" => Ok(arkan_core::RiotTopLeagueTier::Challenger),
+        "grandmaster" => Ok(arkan_core::RiotTopLeagueTier::Grandmaster),
+        "master" => Ok(arkan_core::RiotTopLeagueTier::Master),
+        _ => Err("Unsupported top league tier".to_owned()),
+    }
+}
+
+fn top_league_tier_label(tier: arkan_core::RiotTopLeagueTier) -> &'static str {
+    match tier {
+        arkan_core::RiotTopLeagueTier::Challenger => "challenger",
+        arkan_core::RiotTopLeagueTier::Grandmaster => "grandmaster",
+        arkan_core::RiotTopLeagueTier::Master => "master",
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -768,6 +873,46 @@ fn persist_match_history(
     for (detail, entry) in fetched_matches {
         let match_record = match_record_from_detail(detail, platform.regional_route())?;
         let player_match = player_match_record_from_detail(detail, &account.puuid, entry)?;
+
+        arkan_core::upsert_match(&connection, &match_record).map_err(|error| error.to_string())?;
+        arkan_core::upsert_player_match(&connection, &player_match)
+            .map_err(|error| error.to_string())?;
+    }
+
+    arkan_core::refresh_local_champion_role_stats(&connection, &platform.to_string(), None)
+        .map_err(|error| error.to_string())?;
+
+    Ok(())
+}
+
+fn persist_seed_match_history(
+    summoner: &arkan_core::RiotSummoner,
+    platform: arkan_core::PlatformRoute,
+    tier_label: &str,
+    fetched_matches: &[(Value, MatchHistoryEntry)],
+) -> Result<(), String> {
+    let connection = open_app_database()?;
+    let seed_name = summoner
+        .id
+        .as_deref()
+        .map(|id| format!("top-seed-{id}"))
+        .unwrap_or_else(|| "top-seed".to_owned());
+    let player = arkan_core::PlayerRecord {
+        puuid: summoner.puuid.clone(),
+        game_name: seed_name,
+        tag_line: tier_label.to_uppercase(),
+        platform_id: platform.to_string(),
+        summoner_id: summoner.id.clone(),
+        account_id: summoner.account_id.clone(),
+        summoner_level: Some(summoner.summoner_level),
+        profile_icon_id: Some(summoner.profile_icon_id),
+    };
+
+    arkan_core::upsert_player(&connection, &player).map_err(|error| error.to_string())?;
+
+    for (detail, entry) in fetched_matches {
+        let match_record = match_record_from_detail(detail, platform.regional_route())?;
+        let player_match = player_match_record_from_detail(detail, &summoner.puuid, entry)?;
 
         arkan_core::upsert_match(&connection, &match_record).map_err(|error| error.to_string())?;
         arkan_core::upsert_player_match(&connection, &player_match)
@@ -1433,6 +1578,7 @@ fn main() {
             local_database_status,
             match_history,
             sync_champion_sample,
+            sync_top_champion_sample,
             match_detail,
             league_client_status,
             refresh_champion_role_stats,

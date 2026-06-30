@@ -81,6 +81,60 @@ impl RiotApiClient {
             .map_err(RiotApiError::Http)
     }
 
+    pub async fn summoner_by_id(
+        &self,
+        route: PlatformRoute,
+        encrypted_summoner_id: &str,
+    ) -> Result<RiotSummoner, RiotApiError> {
+        let url = summoner_by_id_url(route, encrypted_summoner_id);
+        let response = self
+            .http
+            .get(url)
+            .header("X-Riot-Token", &self.api_key)
+            .send()
+            .await
+            .map_err(RiotApiError::Http)?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            return Err(RiotApiError::RiotStatus(status.as_u16()));
+        }
+
+        response
+            .json::<RiotSummoner>()
+            .await
+            .map_err(RiotApiError::Http)
+    }
+
+    pub async fn top_league_entries(
+        &self,
+        route: PlatformRoute,
+        tier: RiotTopLeagueTier,
+        queue: &str,
+    ) -> Result<Vec<RiotLeagueEntry>, RiotApiError> {
+        let url = top_league_url(route, tier, queue);
+        let response = self
+            .http
+            .get(url)
+            .header("X-Riot-Token", &self.api_key)
+            .send()
+            .await
+            .map_err(RiotApiError::Http)?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            return Err(RiotApiError::RiotStatus(status.as_u16()));
+        }
+
+        response
+            .json::<RiotLeagueList>()
+            .await
+            .map(|league| league.entries)
+            .map_err(RiotApiError::Http)
+    }
+
     pub async fn champion_mastery_top(
         &self,
         route: PlatformRoute,
@@ -206,6 +260,23 @@ pub fn summoner_by_puuid_url(route: PlatformRoute, puuid: &str) -> String {
     )
 }
 
+pub fn summoner_by_id_url(route: PlatformRoute, encrypted_summoner_id: &str) -> String {
+    format!(
+        "https://{}/lol/summoner/v4/summoners/{}",
+        route.host(),
+        encode_path_segment(encrypted_summoner_id)
+    )
+}
+
+pub fn top_league_url(route: PlatformRoute, tier: RiotTopLeagueTier, queue: &str) -> String {
+    format!(
+        "https://{}/lol/league/v4/{}/by-queue/{}",
+        route.host(),
+        tier.path_segment(),
+        encode_path_segment(queue)
+    )
+}
+
 pub fn champion_mastery_top_url(route: PlatformRoute, puuid: &str, count: u8) -> String {
     format!(
         "https://{}/lol/champion-mastery/v4/champion-masteries/by-puuid/{}/top?count={}",
@@ -284,6 +355,43 @@ pub struct RiotChampionMastery {
     pub last_play_time: Option<i64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RiotTopLeagueTier {
+    Challenger,
+    Grandmaster,
+    Master,
+}
+
+impl RiotTopLeagueTier {
+    pub fn path_segment(self) -> &'static str {
+        match self {
+            Self::Challenger => "challengerleagues",
+            Self::Grandmaster => "grandmasterleagues",
+            Self::Master => "masterleagues",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RiotLeagueList {
+    pub tier: String,
+    pub league_id: String,
+    pub queue: String,
+    pub name: String,
+    pub entries: Vec<RiotLeagueEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RiotLeagueEntry {
+    pub summoner_id: String,
+    pub league_points: u32,
+    pub rank: String,
+    pub wins: u32,
+    pub losses: u32,
+}
+
 #[derive(Debug)]
 pub enum RiotApiError {
     MissingApiKey,
@@ -347,6 +455,34 @@ mod tests {
         assert_eq!(
             summoner_by_puuid_url(PlatformRoute::Euw1, "puuid value"),
             "https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/puuid%20value"
+        );
+    }
+
+    #[test]
+    fn builds_summoner_by_id_url_for_platform() {
+        assert_eq!(
+            summoner_by_id_url(PlatformRoute::Euw1, "encrypted summoner"),
+            "https://euw1.api.riotgames.com/lol/summoner/v4/summoners/encrypted%20summoner"
+        );
+    }
+
+    #[test]
+    fn builds_top_league_urls_for_platform() {
+        assert_eq!(
+            top_league_url(
+                PlatformRoute::Euw1,
+                RiotTopLeagueTier::Challenger,
+                "RANKED_SOLO_5x5"
+            ),
+            "https://euw1.api.riotgames.com/lol/league/v4/challengerleagues/by-queue/RANKED_SOLO_5x5"
+        );
+        assert_eq!(
+            top_league_url(
+                PlatformRoute::Euw1,
+                RiotTopLeagueTier::Grandmaster,
+                "RANKED_FLEX_SR"
+            ),
+            "https://euw1.api.riotgames.com/lol/league/v4/grandmasterleagues/by-queue/RANKED_FLEX_SR"
         );
     }
 
@@ -457,5 +593,30 @@ mod tests {
                 last_play_time: None,
             }
         );
+    }
+
+    #[test]
+    fn deserializes_top_league_response() {
+        let json = r#"{
+            "tier": "CHALLENGER",
+            "leagueId": "league-id",
+            "queue": "RANKED_SOLO_5x5",
+            "name": "Taric's Avengers",
+            "entries": [
+                {
+                    "summonerId": "encrypted-id",
+                    "leaguePoints": 1200,
+                    "rank": "I",
+                    "wins": 220,
+                    "losses": 140
+                }
+            ]
+        }"#;
+
+        let league = serde_json::from_str::<RiotLeagueList>(json).unwrap();
+
+        assert_eq!(league.tier, "CHALLENGER");
+        assert_eq!(league.entries[0].summoner_id, "encrypted-id");
+        assert_eq!(league.entries[0].league_points, 1200);
     }
 }
