@@ -5,6 +5,22 @@ export type ChampionStats = {
   winRate?: number;
 };
 
+export type ChampionRoleStats = {
+  championId: number;
+  championKey: string;
+  championName: string;
+  patch: string;
+  pickRate: number;
+  platformId: string;
+  queueId: number;
+  role: string;
+  sampleSize: number;
+  source: string;
+  tier?: string;
+  winRate: number;
+  wins: number;
+};
+
 export type ChampionSummary = {
   iconUrl: string;
   id: string;

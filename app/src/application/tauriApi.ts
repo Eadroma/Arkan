@@ -1,4 +1,5 @@
 import type { LeagueClientStatus, MatchHistoryEntry, RiotAccount } from "../domain/league";
+import type { ChampionRoleStats } from "../domain/champion";
 import type { MatchDetail } from "../domain/match";
 
 type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
@@ -78,4 +79,14 @@ export async function refreshChampionRoleStats(platform: string, tier?: string):
   }
 
   return invoke<number>("refresh_champion_role_stats", { platform, tier });
+}
+
+export async function championRoleStats(championId: number, platform: string): Promise<ChampionRoleStats[]> {
+  const invoke = tauriInvoke();
+
+  if (!invoke) {
+    return [];
+  }
+
+  return invoke<ChampionRoleStats[]>("champion_role_stats", { championId, platform });
 }

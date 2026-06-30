@@ -49,6 +49,24 @@ struct RiotChampionMasteryResponse {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct ChampionRoleStatsResponse {
+    champion_id: u32,
+    champion_key: String,
+    champion_name: String,
+    patch: String,
+    pick_rate: f64,
+    platform_id: String,
+    queue_id: u32,
+    role: String,
+    sample_size: u32,
+    source: String,
+    tier: Option<String>,
+    win_rate: f64,
+    wins: u32,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct MatchHistoryEntry {
     assists: u32,
     champion_id: u32,
@@ -449,6 +467,48 @@ fn refresh_champion_role_stats(platform: &str, tier: Option<&str>) -> Result<usi
             .map_err(|error| error.to_string())?;
 
     Ok(stats.len())
+}
+
+#[tauri::command]
+fn champion_role_stats(
+    champion_id: u32,
+    platform: &str,
+) -> Result<Vec<ChampionRoleStatsResponse>, String> {
+    let connection = open_app_database()?;
+    let platform = platform
+        .parse::<arkan_core::PlatformRoute>()
+        .map_err(|error| error.to_string())?;
+    let stats = arkan_core::find_champion_role_stats_by_champion(
+        &connection,
+        champion_id,
+        &platform.to_string(),
+    )
+    .map_err(|error| error.to_string())?;
+
+    Ok(stats
+        .into_iter()
+        .map(ChampionRoleStatsResponse::from)
+        .collect())
+}
+
+impl From<arkan_core::ChampionRoleStats> for ChampionRoleStatsResponse {
+    fn from(stats: arkan_core::ChampionRoleStats) -> Self {
+        Self {
+            champion_id: stats.champion_id,
+            champion_key: stats.champion_key,
+            champion_name: stats.champion_name,
+            patch: stats.patch,
+            pick_rate: stats.pick_rate,
+            platform_id: stats.platform_id,
+            queue_id: stats.queue_id,
+            role: stats.role,
+            sample_size: stats.sample_size,
+            source: stats.source,
+            tier: stats.tier,
+            win_rate: stats.win_rate,
+            wins: stats.wins,
+        }
+    }
 }
 
 fn find_lockfile_path() -> Option<PathBuf> {
@@ -1223,7 +1283,8 @@ fn main() {
             match_history,
             match_detail,
             league_client_status,
-            refresh_champion_role_stats
+            refresh_champion_role_stats,
+            champion_role_stats
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Arkan");
