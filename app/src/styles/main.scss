@@ -942,6 +942,62 @@ select {
   gap: 16px;
 }
 
+.top-player-sync-panel {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(220px, 0.8fr);
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: rgb(255 255 255 / 3%);
+  padding: 10px 12px;
+
+  strong {
+    display: block;
+    margin-top: 2px;
+    font-size: 14px;
+  }
+}
+
+.top-player-sync-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  label {
+    display: grid;
+    gap: 3px;
+    min-width: 84px;
+  }
+
+  label span {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  input {
+    width: 86px;
+  }
+}
+
+.top-player-sync-status {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.35;
+  text-align: right;
+
+  &[data-status="success"] {
+    color: var(--accent-strong);
+  }
+
+  &[data-status="error"] {
+    color: var(--danger);
+  }
+}
+
 .champion-catalog {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
@@ -1476,9 +1532,18 @@ select {
 @media (max-width: 1080px) {
   .topbar,
   .section-head,
+  .top-player-sync-panel,
   .hero-panel,
   .rune-board {
     grid-template-columns: 1fr;
+  }
+
+  .top-player-sync-controls {
+    flex-wrap: wrap;
+  }
+
+  .top-player-sync-status {
+    text-align: left;
   }
 
   .build-layout {

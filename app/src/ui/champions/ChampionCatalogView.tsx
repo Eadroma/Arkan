@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
+import { syncTopChampionSample, type TopChampionSampleSyncResult } from "../../application/tauriApi";
 import { useAppActions } from "../../application/useAppActions";
 import {
   filterChampions,
@@ -9,6 +10,7 @@ import {
   type ChampionTag,
 } from "../../domain/champion";
 import { useAppStore } from "../../store/appStore";
+import { Button } from "../components/Button";
 
 const championRoles: Array<ChampionTag | "all"> = [
   "all",
@@ -20,9 +22,16 @@ const championRoles: Array<ChampionTag | "all"> = [
   "Tank",
 ];
 
+type SyncStatus = "idle" | "loading" | "success" | "error";
+
 export function ChampionCatalogView(): React.JSX.Element {
   const { dispatch, state } = useAppStore();
   const { openChampionDetail } = useAppActions();
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [syncTier, setSyncTier] = useState("challenger");
+  const [syncSeedCount, setSyncSeedCount] = useState(3);
+  const [syncMatchesPerSeed, setSyncMatchesPerSeed] = useState(100);
+  const [syncResult, setSyncResult] = useState<TopChampionSampleSyncResult | undefined>();
   const filters = state.championCatalogFilters;
   const minWinRate = parsePercentFilter(filters.minWinRate);
   const minPickRate = parsePercentFilter(filters.minPickRate);
@@ -36,6 +45,25 @@ export function ChampionCatalogView(): React.JSX.Element {
       }),
     [filters.query, filters.role, minPickRate, minWinRate, state.championCatalog],
   );
+  const syncMessage = syncMessageFromState(syncStatus, syncResult);
+
+  async function handleTopPlayerSync(): Promise<void> {
+    setSyncStatus("loading");
+    setSyncResult(undefined);
+
+    try {
+      const result = await syncTopChampionSample(
+        state.search.region,
+        syncTier,
+        syncSeedCount,
+        syncMatchesPerSeed,
+      );
+      setSyncResult(result);
+      setSyncStatus(result ? "success" : "error");
+    } catch {
+      setSyncStatus("error");
+    }
+  }
 
   return (
     <section className="dashboard">
@@ -101,6 +129,50 @@ export function ChampionCatalogView(): React.JSX.Element {
           />
         </div>
       </section>
+      <section className="top-player-sync-panel" aria-label="Synchronisation top players">
+        <div>
+          <p className="panel-kicker">MATCH-V5 sample</p>
+          <strong>Top player seeds</strong>
+        </div>
+        <div className="top-player-sync-controls">
+          <select
+            aria-label="Tier top player"
+            value={syncTier}
+            onChange={(event) => setSyncTier(event.currentTarget.value)}
+          >
+            <option value="challenger">Challenger</option>
+            <option value="grandmaster">Grandmaster</option>
+            <option value="master">Master</option>
+          </select>
+          <label>
+            <span>Seeds</span>
+            <input
+              aria-label="Nombre de seeds"
+              max={10}
+              min={1}
+              type="number"
+              value={syncSeedCount}
+              onChange={(event) => setSyncSeedCount(clampInteger(event.currentTarget.value, 1, 10))}
+            />
+          </label>
+          <label>
+            <span>Matches</span>
+            <input
+              aria-label="Matches par seed"
+              max={500}
+              min={1}
+              step={25}
+              type="number"
+              value={syncMatchesPerSeed}
+              onChange={(event) => setSyncMatchesPerSeed(clampInteger(event.currentTarget.value, 1, 500))}
+            />
+          </label>
+          <Button disabled={syncStatus === "loading"} onClick={() => void handleTopPlayerSync()}>
+            {syncStatus === "loading" ? "Sync..." : "Sync top"}
+          </Button>
+        </div>
+        <span className="top-player-sync-status" data-status={syncStatus}>{syncMessage}</span>
+      </section>
       <section className="champion-catalog">
         {champions.length > 0 ? (
           champions.map((champion) => (
@@ -116,6 +188,35 @@ export function ChampionCatalogView(): React.JSX.Element {
       </section>
     </section>
   );
+}
+
+function clampInteger(value: string, min: number, max: number): number {
+  const parsedValue = Number.parseInt(value, 10);
+
+  if (Number.isNaN(parsedValue)) {
+    return min;
+  }
+
+  return Math.min(Math.max(parsedValue, min), max);
+}
+
+function syncMessageFromState(
+  status: SyncStatus,
+  result: TopChampionSampleSyncResult | undefined,
+): string {
+  if (status === "loading") {
+    return "Synchronisation en cours. Les stats se mettront a jour apres ingestion.";
+  }
+
+  if (status === "error") {
+    return "Sync impossible pour le moment. Verifie la cle Riot ou la rate limit.";
+  }
+
+  if (status === "success" && result) {
+    return `${result.seedsSynced} seeds, ${result.fetchedMatches} matches ajoutes (${result.tier}).`;
+  }
+
+  return "Utilise les top ladders Riot officiels avec des limites prudentes.";
 }
 
 function ChampionTile({
