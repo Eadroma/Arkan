@@ -341,8 +341,8 @@ async fn sync_top_champion_sample(
         .parse::<arkan_core::PlatformRoute>()
         .map_err(|error| error.to_string())?;
     let tier = parse_top_league_tier(tier.unwrap_or("challenger"))?;
-    let seed_count = seed_count.unwrap_or(3).clamp(1, 10);
-    let requested_matches_per_seed = requested_matches_per_seed.unwrap_or(100).clamp(1, 500);
+    let seed_count = seed_count.unwrap_or(1).clamp(1, 10);
+    let requested_matches_per_seed = requested_matches_per_seed.unwrap_or(1).clamp(1, 500);
     let client = arkan_core::RiotApiClient::new(api_key).map_err(|error| error.to_string())?;
     let mut entries = client
         .top_league_entries(platform, tier, "RANKED_SOLO_5x5")

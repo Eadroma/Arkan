@@ -92,8 +92,8 @@ export async function syncChampionSample(
 export async function syncTopChampionSample(
   platform: string,
   tier = "challenger",
-  seedCount = 3,
-  requestedMatchesPerSeed = 100,
+  seedCount = 1,
+  requestedMatchesPerSeed = 1,
 ): Promise<TopChampionSampleSyncResult | undefined> {
   const invoke = tauriInvoke();
 
