@@ -376,9 +376,9 @@ impl RiotTopLeagueTier {
 #[serde(rename_all = "camelCase")]
 pub struct RiotLeagueList {
     pub tier: String,
-    pub league_id: String,
+    pub league_id: Option<String>,
     pub queue: String,
-    pub name: String,
+    pub name: Option<String>,
     pub entries: Vec<RiotLeagueEntry>,
 }
 
@@ -600,9 +600,7 @@ mod tests {
     fn deserializes_top_league_response() {
         let json = r#"{
             "tier": "CHALLENGER",
-            "leagueId": "league-id",
             "queue": "RANKED_SOLO_5x5",
-            "name": "Taric's Avengers",
             "entries": [
                 {
                     "puuid": "player-puuid",
@@ -617,6 +615,8 @@ mod tests {
         let league = serde_json::from_str::<RiotLeagueList>(json).unwrap();
 
         assert_eq!(league.tier, "CHALLENGER");
+        assert_eq!(league.league_id, None);
+        assert_eq!(league.name, None);
         assert_eq!(league.entries[0].puuid.as_deref(), Some("player-puuid"));
         assert_eq!(league.entries[0].league_points, 1200);
     }
