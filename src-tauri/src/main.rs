@@ -863,8 +863,25 @@ fn open_app_database() -> Result<rusqlite::Connection, String> {
 fn open_database_at(path: &Path) -> Result<rusqlite::Connection, String> {
     let mut connection =
         rusqlite::Connection::open(path).map_err(|error| format!("failed to open DB: {error}"))?;
+    configure_database_connection(&connection)?;
     arkan_core::migrate(&mut connection).map_err(|error| error.to_string())?;
     Ok(connection)
+}
+
+fn configure_database_connection(connection: &rusqlite::Connection) -> Result<(), String> {
+    connection
+        .busy_timeout(Duration::from_secs(5))
+        .map_err(|error| format!("failed to configure DB busy timeout: {error}"))?;
+    connection
+        .execute_batch(
+            r#"
+            PRAGMA journal_mode = WAL;
+            PRAGMA synchronous = NORMAL;
+            PRAGMA foreign_keys = ON;
+            "#,
+        )
+        .map_err(|error| format!("failed to configure DB pragmas: {error}"))?;
+    Ok(())
 }
 
 fn persist_current_summoner(summoner: &CurrentSummoner) -> Result<(), String> {

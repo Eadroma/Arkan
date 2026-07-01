@@ -63,6 +63,7 @@ export function ChampionCatalogView(): React.JSX.Element {
       setSyncResult(result);
       setSyncStatus(result ? "success" : "error");
       if (result) {
+        await waitForDatabaseFlush();
         await loadChampionCatalog(true);
       }
       if (!result) {
@@ -197,6 +198,10 @@ export function ChampionCatalogView(): React.JSX.Element {
       </section>
     </section>
   );
+}
+
+function waitForDatabaseFlush(): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, 250));
 }
 
 function clampInteger(value: string, min: number, max: number): number {
