@@ -742,6 +742,18 @@ fn champion_role_stats(
 }
 
 #[tauri::command]
+fn champion_catalog_stats(platform: &str) -> Result<Vec<ChampionRoleStatsResponse>, String> {
+    let connection = open_app_database()?;
+    let stats = arkan_core::find_best_champion_role_stats_by_platform(&connection, platform)
+        .map_err(|error| error.to_string())?;
+
+    Ok(stats
+        .into_iter()
+        .map(ChampionRoleStatsResponse::from)
+        .collect())
+}
+
+#[tauri::command]
 fn champion_spell_pairs(champion_id: u32) -> Result<Vec<ChampionSpellPairStatsResponse>, String> {
     let connection = open_app_database()?;
     let pairs = arkan_core::find_local_champion_spell_pairs(&connection, champion_id)
@@ -1643,6 +1655,7 @@ fn main() {
             league_client_status,
             refresh_champion_role_stats,
             champion_role_stats,
+            champion_catalog_stats,
             champion_spell_pairs,
             champion_rune_pages
         ])

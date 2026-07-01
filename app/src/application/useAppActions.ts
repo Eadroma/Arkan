@@ -2,6 +2,7 @@ import { useCallback } from "react";
 
 import { latestDataDragonVersion, loadChampionDetail, loadChampionIndex, profileIconUrl } from "./dataDragonApi";
 import {
+  championCatalogStats,
   hasTauriRuntime,
   leagueClientStatus,
   matchDetail,
@@ -16,7 +17,7 @@ import { useAppStore, type ViewName } from "../store/appStore";
 
 export function useAppActions(): {
   detectLeagueClient: () => Promise<void>;
-  loadChampionCatalog: () => Promise<void>;
+  loadChampionCatalog: (force?: boolean) => Promise<void>;
   loadMatchHistoryForDisplayedPlayer: () => Promise<void>;
   loadMoreMatchHistory: () => Promise<void>;
   openChampionDetail: (championId: string) => Promise<void>;
@@ -28,8 +29,8 @@ export function useAppActions(): {
 } {
   const { dispatch, state } = useAppStore();
 
-  const loadChampionCatalog = useCallback(async () => {
-    if (state.championCatalog.length > 0 || state.championCatalogStatus === "loading") {
+  const loadChampionCatalog = useCallback(async (force = false) => {
+    if (!force && (state.championCatalog.length > 0 || state.championCatalogStatus === "loading")) {
       return;
     }
 
@@ -37,14 +38,36 @@ export function useAppActions(): {
 
     try {
       const index = await loadChampionIndex();
+      const sampleStats = await championCatalogStats(state.playerProfile.region || state.search.region);
+      const statsByChampionId = new Map(sampleStats.map((stats) => [stats.championId, stats]));
       const champions = [...index.values()].sort((first, second) =>
         first.name.localeCompare(second.name, "fr"),
-      );
+      ).map((champion) => {
+        const stats = statsByChampionId.get(Number(champion.key));
+
+        if (!stats) {
+          return champion;
+        }
+
+        return {
+          ...champion,
+          stats: {
+            pickRate: stats.pickRate,
+            winRate: stats.winRate,
+          },
+        };
+      });
       dispatch({ champions, type: "championCatalogLoaded" });
     } catch {
       dispatch({ status: "error", type: "championCatalogStatusChanged" });
     }
-  }, [dispatch, state.championCatalog.length, state.championCatalogStatus]);
+  }, [
+    dispatch,
+    state.championCatalog.length,
+    state.championCatalogStatus,
+    state.playerProfile.region,
+    state.search.region,
+  ]);
 
   const openChampionDetail = useCallback(
     async (championId: string) => {
