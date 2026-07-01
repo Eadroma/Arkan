@@ -942,7 +942,7 @@ fn persist_seed_match_history(
         .summoner_id
         .as_deref()
         .map(|id| format!("top-seed-{id}"))
-        .unwrap_or_else(|| "top-seed".to_owned());
+        .unwrap_or_else(|| top_seed_name_from_puuid(&seed.puuid));
     let player = arkan_core::PlayerRecord {
         puuid: seed.puuid.clone(),
         game_name: seed_name,
@@ -969,6 +969,20 @@ fn persist_seed_match_history(
         .map_err(|error| error.to_string())?;
 
     Ok(())
+}
+
+fn top_seed_name_from_puuid(puuid: &str) -> String {
+    let suffix = puuid
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric())
+        .take(12)
+        .collect::<String>();
+
+    if suffix.is_empty() {
+        "top-seed-unknown".to_owned()
+    } else {
+        format!("top-seed-{suffix}")
+    }
 }
 
 fn match_record_from_detail(
@@ -1683,6 +1697,15 @@ mod tests {
         assert_eq!(player.profile_icon_id, Some(29));
 
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn builds_unique_top_seed_name_from_puuid() {
+        assert_eq!(
+            top_seed_name_from_puuid("Jv4j0KijNEvsJw_5zAyH"),
+            "top-seed-Jv4j0KijNEvs"
+        );
+        assert_eq!(top_seed_name_from_puuid("___"), "top-seed-unknown");
     }
 
     #[test]
