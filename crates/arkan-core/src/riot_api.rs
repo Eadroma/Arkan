@@ -385,7 +385,8 @@ pub struct RiotLeagueList {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RiotLeagueEntry {
-    pub summoner_id: String,
+    pub puuid: Option<String>,
+    pub summoner_id: Option<String>,
     pub league_points: u32,
     pub rank: String,
     pub wins: u32,
@@ -604,7 +605,7 @@ mod tests {
             "name": "Taric's Avengers",
             "entries": [
                 {
-                    "summonerId": "encrypted-id",
+                    "puuid": "player-puuid",
                     "leaguePoints": 1200,
                     "rank": "I",
                     "wins": 220,
@@ -616,7 +617,34 @@ mod tests {
         let league = serde_json::from_str::<RiotLeagueList>(json).unwrap();
 
         assert_eq!(league.tier, "CHALLENGER");
-        assert_eq!(league.entries[0].summoner_id, "encrypted-id");
+        assert_eq!(league.entries[0].puuid.as_deref(), Some("player-puuid"));
         assert_eq!(league.entries[0].league_points, 1200);
+    }
+
+    #[test]
+    fn deserializes_legacy_top_league_response_with_summoner_id() {
+        let json = r#"{
+            "tier": "CHALLENGER",
+            "leagueId": "league-id",
+            "queue": "RANKED_SOLO_5x5",
+            "name": "Taric's Avengers",
+            "entries": [
+                {
+                    "summonerId": "encrypted-id",
+                    "leaguePoints": 1200,
+                    "rank": "I",
+                    "wins": 220,
+                    "losses": 140
+                }
+            ]
+        }"#;
+
+        let league = serde_json::from_str::<RiotLeagueList>(json).unwrap();
+
+        assert_eq!(
+            league.entries[0].summoner_id.as_deref(),
+            Some("encrypted-id")
+        );
+        assert_eq!(league.entries[0].puuid, None);
     }
 }

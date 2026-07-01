@@ -31,6 +31,7 @@ export function ChampionCatalogView(): React.JSX.Element {
   const [syncTier, setSyncTier] = useState("challenger");
   const [syncSeedCount, setSyncSeedCount] = useState(3);
   const [syncMatchesPerSeed, setSyncMatchesPerSeed] = useState(100);
+  const [syncError, setSyncError] = useState<string | undefined>();
   const [syncResult, setSyncResult] = useState<TopChampionSampleSyncResult | undefined>();
   const filters = state.championCatalogFilters;
   const minWinRate = parsePercentFilter(filters.minWinRate);
@@ -45,10 +46,11 @@ export function ChampionCatalogView(): React.JSX.Element {
       }),
     [filters.query, filters.role, minPickRate, minWinRate, state.championCatalog],
   );
-  const syncMessage = syncMessageFromState(syncStatus, syncResult);
+  const syncMessage = syncMessageFromState(syncStatus, syncResult, syncError);
 
   async function handleTopPlayerSync(): Promise<void> {
     setSyncStatus("loading");
+    setSyncError(undefined);
     setSyncResult(undefined);
 
     try {
@@ -60,7 +62,11 @@ export function ChampionCatalogView(): React.JSX.Element {
       );
       setSyncResult(result);
       setSyncStatus(result ? "success" : "error");
-    } catch {
+      if (!result) {
+        setSyncError("Tauri runtime indisponible.");
+      }
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : String(error));
       setSyncStatus("error");
     }
   }
@@ -203,13 +209,14 @@ function clampInteger(value: string, min: number, max: number): number {
 function syncMessageFromState(
   status: SyncStatus,
   result: TopChampionSampleSyncResult | undefined,
+  error?: string,
 ): string {
   if (status === "loading") {
     return "Synchronisation en cours. Les stats se mettront a jour apres ingestion.";
   }
 
   if (status === "error") {
-    return "Sync impossible pour le moment. Verifie la cle Riot ou la rate limit.";
+    return error ? `Sync impossible: ${error}` : "Sync impossible pour le moment.";
   }
 
   if (status === "success" && result) {

@@ -360,14 +360,11 @@ async fn sync_top_champion_sample(
     let mut seeds_synced = 0_usize;
 
     for entry in entries.into_iter().take(usize::from(seed_count)) {
-        let summoner = client
-            .summoner_by_id(platform, &entry.summoner_id)
-            .await
-            .map_err(|error| error.to_string())?;
+        let seed_identity = top_player_seed_identity(&client, platform, &entry).await?;
         let fetched_matches = fetch_sample_matches_for_puuid(
             &client,
             platform,
-            &summoner.puuid,
+            &seed_identity.puuid,
             requested_matches_per_seed,
         )
         .await?;
@@ -375,7 +372,7 @@ async fn sync_top_champion_sample(
         fetched_match_count += fetched_matches.len();
         seeds_synced += 1;
         persist_seed_match_history(
-            &summoner,
+            &seed_identity,
             platform,
             top_league_tier_label(tier),
             &fetched_matches,
@@ -388,6 +385,55 @@ async fn sync_top_champion_sample(
         seeds_synced,
         source: "top-player-sample-match-v5".to_owned(),
         tier: top_league_tier_label(tier).to_owned(),
+    })
+}
+
+#[derive(Debug)]
+struct TopPlayerSeedIdentity {
+    account_id: Option<String>,
+    profile_icon_id: Option<u32>,
+    puuid: String,
+    summoner_id: Option<String>,
+    summoner_level: Option<u32>,
+}
+
+async fn top_player_seed_identity(
+    client: &arkan_core::RiotApiClient,
+    platform: arkan_core::PlatformRoute,
+    entry: &arkan_core::RiotLeagueEntry,
+) -> Result<TopPlayerSeedIdentity, String> {
+    if let Some(puuid) = entry
+        .puuid
+        .as_ref()
+        .filter(|puuid| !puuid.trim().is_empty())
+    {
+        return Ok(TopPlayerSeedIdentity {
+            account_id: None,
+            profile_icon_id: None,
+            puuid: puuid.to_owned(),
+            summoner_id: entry.summoner_id.clone(),
+            summoner_level: None,
+        });
+    }
+
+    let Some(summoner_id) = entry
+        .summoner_id
+        .as_ref()
+        .filter(|summoner_id| !summoner_id.trim().is_empty())
+    else {
+        return Err("League entry is missing both puuid and summonerId".to_owned());
+    };
+    let summoner = client
+        .summoner_by_id(platform, summoner_id)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    Ok(TopPlayerSeedIdentity {
+        account_id: summoner.account_id,
+        profile_icon_id: Some(summoner.profile_icon_id),
+        puuid: summoner.puuid,
+        summoner_id: summoner.id,
+        summoner_level: Some(summoner.summoner_level),
     })
 }
 
@@ -886,33 +932,33 @@ fn persist_match_history(
 }
 
 fn persist_seed_match_history(
-    summoner: &arkan_core::RiotSummoner,
+    seed: &TopPlayerSeedIdentity,
     platform: arkan_core::PlatformRoute,
     tier_label: &str,
     fetched_matches: &[(Value, MatchHistoryEntry)],
 ) -> Result<(), String> {
     let connection = open_app_database()?;
-    let seed_name = summoner
-        .id
+    let seed_name = seed
+        .summoner_id
         .as_deref()
         .map(|id| format!("top-seed-{id}"))
         .unwrap_or_else(|| "top-seed".to_owned());
     let player = arkan_core::PlayerRecord {
-        puuid: summoner.puuid.clone(),
+        puuid: seed.puuid.clone(),
         game_name: seed_name,
         tag_line: tier_label.to_uppercase(),
         platform_id: platform.to_string(),
-        summoner_id: summoner.id.clone(),
-        account_id: summoner.account_id.clone(),
-        summoner_level: Some(summoner.summoner_level),
-        profile_icon_id: Some(summoner.profile_icon_id),
+        summoner_id: seed.summoner_id.clone(),
+        account_id: seed.account_id.clone(),
+        summoner_level: seed.summoner_level,
+        profile_icon_id: seed.profile_icon_id,
     };
 
     arkan_core::upsert_player(&connection, &player).map_err(|error| error.to_string())?;
 
     for (detail, entry) in fetched_matches {
         let match_record = match_record_from_detail(detail, platform.regional_route())?;
-        let player_match = player_match_record_from_detail(detail, &summoner.puuid, entry)?;
+        let player_match = player_match_record_from_detail(detail, &seed.puuid, entry)?;
 
         arkan_core::upsert_match(&connection, &match_record).map_err(|error| error.to_string())?;
         arkan_core::upsert_player_match(&connection, &player_match)
