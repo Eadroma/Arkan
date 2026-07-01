@@ -29,8 +29,8 @@ export function ChampionCatalogView(): React.JSX.Element {
   const { openChampionDetail } = useAppActions();
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [syncTier, setSyncTier] = useState("challenger");
-  const [syncSeedCount, setSyncSeedCount] = useState(3);
-  const [syncMatchesPerSeed, setSyncMatchesPerSeed] = useState(100);
+  const [syncSeedCount, setSyncSeedCount] = useState(1);
+  const [syncMatchesPerSeed, setSyncMatchesPerSeed] = useState(1);
   const [syncError, setSyncError] = useState<string | undefined>();
   const [syncResult, setSyncResult] = useState<TopChampionSampleSyncResult | undefined>();
   const filters = state.championCatalogFilters;
@@ -154,23 +154,23 @@ export function ChampionCatalogView(): React.JSX.Element {
             <span>Seeds</span>
             <input
               aria-label="Nombre de seeds"
-              max={10}
+              max={3}
               min={1}
               type="number"
               value={syncSeedCount}
-              onChange={(event) => setSyncSeedCount(clampInteger(event.currentTarget.value, 1, 10))}
+              onChange={(event) => setSyncSeedCount(clampInteger(event.currentTarget.value, 1, 3))}
             />
           </label>
           <label>
             <span>Matches</span>
             <input
               aria-label="Matches par seed"
-              max={500}
+              max={25}
               min={1}
-              step={25}
+              step={1}
               type="number"
               value={syncMatchesPerSeed}
-              onChange={(event) => setSyncMatchesPerSeed(clampInteger(event.currentTarget.value, 1, 500))}
+              onChange={(event) => setSyncMatchesPerSeed(clampInteger(event.currentTarget.value, 1, 25))}
             />
           </label>
           <Button disabled={syncStatus === "loading"} onClick={() => void handleTopPlayerSync()}>
@@ -216,7 +216,7 @@ function syncMessageFromState(
   }
 
   if (status === "error") {
-    return error ? `Sync impossible: ${error}` : "Sync impossible pour le moment.";
+    return syncErrorMessage(error);
   }
 
   if (status === "success" && result) {
@@ -224,6 +224,18 @@ function syncMessageFromState(
   }
 
   return "Utilise les top ladders Riot officiels avec des limites prudentes.";
+}
+
+function syncErrorMessage(error: string | undefined): string {
+  if (!error) {
+    return "Sync impossible pour le moment.";
+  }
+
+  if (error.includes("HTTP 429")) {
+    return "Rate limit Riot atteinte. Attends 1-2 minutes puis retente avec 1 seed / 1 match.";
+  }
+
+  return `Sync impossible: ${error}`;
 }
 
 function ChampionTile({
