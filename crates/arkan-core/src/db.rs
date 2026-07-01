@@ -527,6 +527,50 @@ pub fn find_champion_role_stats_by_champion(
     Ok(stats)
 }
 
+pub fn find_best_champion_role_stats_by_platform(
+    connection: &Connection,
+    platform_id: &str,
+) -> Result<Vec<ChampionRoleStats>, DbError> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT
+            champion_id,
+            champion_key,
+            champion_name,
+            role,
+            patch,
+            platform_id,
+            queue_id,
+            tier,
+            sample_size,
+            wins,
+            win_rate,
+            pick_rate,
+            source
+        FROM (
+            SELECT
+                *,
+                ROW_NUMBER() OVER (
+                    PARTITION BY champion_id
+                    ORDER BY sample_size DESC, collected_at DESC
+                ) AS row_rank
+            FROM champion_role_stats
+            WHERE platform_id = ?1
+        )
+        WHERE row_rank = 1
+        ORDER BY champion_name ASC
+        "#,
+    )?;
+    let rows = statement.query_map(params![platform_id], champion_role_stats_from_row)?;
+    let mut stats = Vec::new();
+
+    for row in rows {
+        stats.push(row?);
+    }
+
+    Ok(stats)
+}
+
 pub fn refresh_local_champion_role_stats(
     connection: &Connection,
     platform_id: &str,
@@ -1104,6 +1148,57 @@ mod tests {
             .unwrap(),
             Some(stats)
         );
+    }
+
+    #[test]
+    fn finds_best_champion_role_stats_by_platform() {
+        let connection = migrated_connection();
+        let twitch_bottom = ChampionRoleStats {
+            champion_id: 29,
+            champion_key: "29".to_owned(),
+            champion_name: "Twitch".to_owned(),
+            role: "BOTTOM".to_owned(),
+            patch: "16.12".to_owned(),
+            platform_id: "EUW1".to_owned(),
+            queue_id: 420,
+            tier: None,
+            sample_size: 25,
+            wins: 13,
+            win_rate: 52.0,
+            pick_rate: 5.0,
+            source: "sample-match-v5".to_owned(),
+        };
+        let twitch_jungle = ChampionRoleStats {
+            role: "JUNGLE".to_owned(),
+            sample_size: 4,
+            wins: 1,
+            win_rate: 25.0,
+            pick_rate: 0.8,
+            ..twitch_bottom.clone()
+        };
+        let annie_middle = ChampionRoleStats {
+            champion_id: 1,
+            champion_key: "1".to_owned(),
+            champion_name: "Annie".to_owned(),
+            role: "MIDDLE".to_owned(),
+            sample_size: 12,
+            wins: 6,
+            win_rate: 50.0,
+            pick_rate: 2.4,
+            ..twitch_bottom.clone()
+        };
+
+        upsert_champion_role_stats(&connection, &twitch_bottom).unwrap();
+        upsert_champion_role_stats(&connection, &twitch_jungle).unwrap();
+        upsert_champion_role_stats(&connection, &annie_middle).unwrap();
+
+        let stats = find_best_champion_role_stats_by_platform(&connection, "EUW1").unwrap();
+
+        assert_eq!(stats.len(), 2);
+        assert_eq!(stats[0].champion_id, 1);
+        assert_eq!(stats[1].champion_id, 29);
+        assert_eq!(stats[1].role, "BOTTOM");
+        assert_eq!(stats[1].sample_size, 25);
     }
 
     #[test]

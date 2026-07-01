@@ -26,7 +26,7 @@ type SyncStatus = "idle" | "loading" | "success" | "error";
 
 export function ChampionCatalogView(): React.JSX.Element {
   const { dispatch, state } = useAppStore();
-  const { openChampionDetail } = useAppActions();
+  const { loadChampionCatalog, openChampionDetail } = useAppActions();
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [syncTier, setSyncTier] = useState("challenger");
   const [syncSeedCount, setSyncSeedCount] = useState(1);
@@ -62,6 +62,9 @@ export function ChampionCatalogView(): React.JSX.Element {
       );
       setSyncResult(result);
       setSyncStatus(result ? "success" : "error");
+      if (result) {
+        await loadChampionCatalog(true);
+      }
       if (!result) {
         setSyncError("Tauri runtime indisponible.");
       }

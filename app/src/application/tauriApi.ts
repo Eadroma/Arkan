@@ -139,6 +139,16 @@ export async function championRoleStats(championId: number, platform: string): P
   return invoke<ChampionRoleStats[]>("champion_role_stats", { championId, platform });
 }
 
+export async function championCatalogStats(platform: string): Promise<ChampionRoleStats[]> {
+  const invoke = tauriInvoke();
+
+  if (!invoke) {
+    return [];
+  }
+
+  return invoke<ChampionRoleStats[]>("champion_catalog_stats", { platform });
+}
+
 export async function championSpellPairs(championId: number): Promise<ChampionSpellPairStats[]> {
   const invoke = tauriInvoke();
 
